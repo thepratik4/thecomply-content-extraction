@@ -1,4 +1,4 @@
-﻿/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    Comply AI — Landing Page
    Design tokens: white bg · charcoal text · red accent · thin borders
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
@@ -204,25 +204,31 @@ ul { list-style: none; }
   align-items: center;
 }
 
-.proof-strip {
+/* ── Output format hint ──────────────────────────────── */
+.output-hint {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding-top: 4px;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: fit-content;
 }
-.proof-stat {
-  font-size: 12.5px;
-  color: var(--ink-muted);
-}
-.proof-stat strong {
-  color: var(--ink);
+.output-hint-label {
+  font-size: 10.5px;
   font-weight: 600;
-  margin-right: 3px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  flex-shrink: 0;
 }
-.proof-divider {
-  width: 1px;
-  height: 16px;
-  background: var(--border);
+.output-hint-code {
+  font-family: 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
+  font-size: 11.5px;
+  color: var(--red);
+  background: transparent;
+  white-space: nowrap;
 }
 
 /* ── Animation frame (right panel) ─────────────────────── */
