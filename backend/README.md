@@ -4,31 +4,46 @@ A high-performance Python extraction pipeline and FastAPI service that extracts 
 
 ## Key Features
 
-- **Heuristic Heading Detection:** Leverages `pdfplumber` to extract character-level attributes (font name, font size, coordinates). Computes the dominant modal body font size dynamically and identifies section headings based on font size tiers, bold weights, and spatial isolation.
+- **Heuristic Heading Detection & Hierarchy:** Leverages `pdfplumber` to extract character-level attributes (font name, font size, coordinates). Computes the dominant modal body font size dynamically, identifies H1, H2, and H3 tiers, handles numbered patterns (e.g. `1`, `1.1`, `01`, `02`), and accurately joins multi-line headings.
 - **Kerning & Encoding Repair:** Automatically fixes font encoding and kerning artifacts common in regulatory/legal PDFs (e.g., repairing single-letter word breaks like `T able` → `Table`, `F iling` → `Filing`).
 - **Margin & Noise Filtering:** Identifies and strips running headers, footers, page numbers, and repetitive tracking codes (such as SERFF numbers).
-- **Sub-Second Performance:** Processes multi-page complex PDFs (e.g., 15-page AMGN SEC filing) in **~0.7 seconds**, easily exceeding the < 2-second SLA.
-- **Clean JSON Output:** Returns structured, predictable JSON:
+- **Sub-Second Performance & Caching:** Processes multi-page complex PDFs (e.g., 15-page AMGN SEC filing) in **~0.7 seconds**, with thread-safe LRU caching delivering sub-millisecond repeated responses.
+- **Clean JSON Output:** Returns structured, predictable JSON adhering to the ExtractAI contract:
   ```json
   {
     "success": true,
+    "metadata": {
+      "file_name": "AMGN-135003565.pdf",
+      "file_size": "30.2 KB",
+      "total_pages": 15,
+      "sections_found": 11,
+      "extraction_time_ms": 740,
+      "language": "en"
+    },
     "data": [
       {
+        "id": "section-1",
         "heading": "Table of Contents",
-        "text": "User Usage Agreement Attachments..."
+        "level": 1,
+        "text": "User Usage Agreement\nAttachments...",
+        "page": 1,
+        "char_count": 263
       },
       {
+        "id": "section-2",
         "heading": "Filing at a Glance",
-        "text": "Company: American General Life Insurance Company..."
+        "level": 1,
+        "text": "Company: American General Life Insurance Company...",
+        "page": 2,
+        "char_count": 607
       }
-    ],
-    "total_pages": 15,
-    "processing_time_sec": 0.728
+    ]
   }
   ```
-- **Error Handling:** Returns RFC-compliant HTTP status codes:
-  - `400 Bad Request`: Missing file, non-PDF extension, empty file (0 bytes), or invalid magic bytes.
-  - `422 Unprocessable Entity`: Corrupt PDF, image-only/scanned PDF without OCR layer.
+- **Error Handling & Protection:**
+  - `400 Bad Request`: No file uploaded or empty file (0 bytes).
+  - `422 Unprocessable Entity`: File is not a PDF (invalid extension or missing `%PDF-` header), corrupted PDF, or unparseable stream.
+  - `504 Gateway Timeout`: Prevents requests from running longer than 30 seconds.
   - `500 Internal Server Error`: Unhandled server exceptions.
 - **CORS Enabled:** Pre-configured with CORS middleware to integrate with React / Vite frontends.
 
@@ -92,54 +107,40 @@ curl -X POST "http://127.0.0.1:8000/api/extract" \
 ```json
 {
   "success": true,
+  "metadata": {
+    "file_name": "AMGN-135003565.pdf",
+    "file_size": "30.2 KB",
+    "total_pages": 15,
+    "sections_found": 11,
+    "extraction_time_ms": 740,
+    "language": "en"
+  },
   "data": [
     {
+      "id": "section-1",
       "heading": "Table of Contents",
-      "text": "User Usage Agreement Attachments Usage Agreement..."
+      "level": 1,
+      "text": "User Usage Agreement\nAttachments: Usage Agreement Usage Agreement.pdf...",
+      "page": 1,
+      "char_count": 263
     },
     {
+      "id": "section-2",
       "heading": "Filing at a Glance",
-      "text": "Company: American General Life Insurance Company Product Name: Expanded SOV..."
+      "level": 1,
+      "text": "Company: American General Life Insurance Company\nProduct Name: Expanded SOV...",
+      "page": 2,
+      "char_count": 607
     },
     {
+      "id": "section-3",
       "heading": "General Information",
-      "text": "Project Name: Status of Filing in Domicile: Pending..."
-    },
-    {
-      "heading": "Company and Contact",
-      "text": "Filing Contact Information Aileen Apuy, Manager, State Filings..."
-    },
-    {
-      "heading": "Filing Fees",
-      "text": "State Fees Fee Required? Yes Fee Amount: $125.00..."
-    },
-    {
-      "heading": "Correspondence Summary",
-      "text": "Dispositions Status Created By Created On Date Submitted..."
-    },
-    {
-      "heading": "Disposition",
-      "text": "Disposition Date: 08/17/2026 Effective Date: Status: Received and filed..."
-    },
-    {
-      "heading": "Objection Letter",
-      "text": "Objection Letter Status Objection Letter Sent..."
-    },
-    {
-      "heading": "Response Letter",
-      "text": "Response Letter Status Submitted to State..."
-    },
-    {
-      "heading": "Note To Reviewer",
-      "text": "Created By: Aileen Apuy on 08/13/2026 10:48 AM..."
-    },
-    {
-      "heading": "Supporting Document Schedules",
-      "text": "Bypassed - Item: Actuarial Memorandum Bypass Reason: N/A..."
+      "level": 1,
+      "text": "Project Name: Status of Filing in Domicile: Pending...",
+      "page": 3,
+      "char_count": 1607
     }
-  ],
-  "total_pages": 15,
-  "processing_time_sec": 0.728
+  ]
 }
 ```
 

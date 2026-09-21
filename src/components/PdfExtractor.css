@@ -674,6 +674,44 @@
   border-radius: 4px;
 }
 
+.heading-level-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 2.5px 7px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.heading-level-pill--h1 {
+  background: #fdf2f2;
+  color: #c0392b;
+  border: 1px solid rgba(192, 57, 43, 0.25);
+}
+
+.heading-level-pill--h2 {
+  background: #edf4fb;
+  color: #2980b9;
+  border: 1px solid rgba(41, 128, 185, 0.25);
+}
+
+.heading-level-pill--h3 {
+  background: #f4f6f8;
+  color: #576574;
+  border: 1px solid rgba(87, 101, 116, 0.25);
+}
+
+.section-page-pill {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  padding: 2.5px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.02em;
+}
+
 .section-heading-title {
   font-size: 18px;
   font-weight: 700;

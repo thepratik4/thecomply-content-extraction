@@ -4,9 +4,12 @@ import "./PdfExtractor.css";
 
 interface ExtractionMeta {
   totalPages?: number;
+  extractionTimeMs?: number;
   processingTimeSec?: number;
   fileName?: string;
-  fileSize?: number;
+  fileSize?: string | number;
+  sectionsFound?: number;
+  language?: string;
 }
 
 export const PdfExtractor: React.FC = () => {
@@ -91,9 +94,12 @@ export const PdfExtractor: React.FC = () => {
         setResults(MOCK_EXTRACTION_DATA);
         setMeta({
           totalPages: 15,
+          extractionTimeMs: 740,
           processingTimeSec: 0.74,
           fileName: "AMGN-135003565.pdf",
-          fileSize: 30934
+          fileSize: "30.2 KB",
+          sectionsFound: 11,
+          language: "en"
         });
         setIsLoading(false);
         // Scroll smoothly to results
@@ -132,9 +138,12 @@ export const PdfExtractor: React.FC = () => {
         setResults(MOCK_EXTRACTION_DATA);
         setMeta({
           totalPages: 15,
+          extractionTimeMs: 680,
           processingTimeSec: 0.68,
           fileName: file.name,
-          fileSize: file.size
+          fileSize: formatFileSize(file.size),
+          sectionsFound: 11,
+          language: "en"
         });
         setIsLoading(false);
         setTimeout(() => {
@@ -176,11 +185,15 @@ export const PdfExtractor: React.FC = () => {
       const json = await response.json();
       if (json.success && Array.isArray(json.data)) {
         setResults(json.data);
+        const m = json.metadata || {};
         setMeta({
-          totalPages: json.total_pages,
-          processingTimeSec: json.processing_time_sec,
-          fileName: file.name,
-          fileSize: file.size
+          totalPages: m.total_pages ?? json.total_pages,
+          extractionTimeMs: m.extraction_time_ms ?? (json.processing_time_sec ? Math.round(json.processing_time_sec * 1000) : undefined),
+          processingTimeSec: m.extraction_time_ms ? (m.extraction_time_ms / 1000) : json.processing_time_sec,
+          fileName: m.file_name ?? file.name,
+          fileSize: m.file_size ?? formatFileSize(file.size),
+          sectionsFound: m.sections_found ?? json.data.length,
+          language: m.language ?? "en"
         });
         setTimeout(() => {
           resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -456,16 +469,25 @@ export const PdfExtractor: React.FC = () => {
             <div className="results-header-bar">
               <div className="results-meta">
                 <span className="results-count-badge">
-                  {results.length} Sections Found
+                  {meta?.sectionsFound ?? results.length} Sections Found
                 </span>
-                {meta?.processingTimeSec !== undefined && (
+                {meta?.extractionTimeMs !== undefined ? (
+                  <span className="results-stat">
+                    ⚡ {meta.extractionTimeMs}ms roundtrip
+                  </span>
+                ) : meta?.processingTimeSec !== undefined ? (
                   <span className="results-stat">
                     ⚡ {meta.processingTimeSec.toFixed(2)}s roundtrip
                   </span>
-                )}
+                ) : null}
                 {meta?.totalPages && (
                   <span className="results-stat">
                     📄 {meta.totalPages} pages
+                  </span>
+                )}
+                {meta?.language && (
+                  <span className="results-stat">
+                    🌐 {meta.language.toUpperCase()}
                   </span>
                 )}
               </div>
@@ -580,6 +602,16 @@ export const PdfExtractor: React.FC = () => {
                           <span className="section-index-pill">
                             {String(idx + 1).padStart(2, "0")}
                           </span>
+                          {section.level !== undefined && (
+                            <span className={`heading-level-pill heading-level-pill--h${section.level}`}>
+                              H{section.level}
+                            </span>
+                          )}
+                          {section.page !== undefined && (
+                            <span className="section-page-pill">
+                              Page {section.page}
+                            </span>
+                          )}
                           <h3 className="section-heading-title">{section.heading}</h3>
                         </div>
 

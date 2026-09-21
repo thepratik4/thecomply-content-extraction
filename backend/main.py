@@ -1,11 +1,11 @@
 """
 ExtractAI FastAPI Server
 Provides the POST /api/extract endpoint to convert PDF documents into structured
-heading and body-text pairs.
+heading and body-text pairs with hierarchy metadata.
 """
 
+import asyncio
 from typing import List, Optional
-import os
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -19,20 +19,34 @@ except ImportError:
 
 # --- Response Schemas ---
 class SectionItem(BaseModel):
+    id: str = Field(..., description="Unique stable section identifier, e.g., 'section-1'")
     heading: str = Field(..., description="Detected section heading")
+    level: int = Field(1, description="Heading hierarchy level (1 for H1, 2 for H2, 3 for H3)")
     text: str = Field(..., description="Associated body text under the heading")
+    page: int = Field(..., description="1-indexed source page where the heading begins")
+    char_count: int = Field(..., description="Character count of associated body text")
+
+
+class ExtractionMetadata(BaseModel):
+    file_name: str = Field(..., description="Name of the extracted file")
+    file_size: str = Field(..., description="Formatted file size string, e.g., '30.2 KB'")
+    total_pages: int = Field(..., description="Total pages in the PDF document")
+    sections_found: int = Field(..., description="Total number of extracted sections")
+    extraction_time_ms: int = Field(..., description="Extraction execution duration in milliseconds")
+    language: str = Field("en", description="Detected language ISO code")
 
 
 class ExtractionResponse(BaseModel):
     success: bool = Field(True, description="Indicates whether extraction succeeded")
-    data: List[SectionItem] = Field(..., description="List of extracted heading-text pairs")
-    total_pages: Optional[int] = Field(None, description="Total number of pages processed")
-    processing_time_sec: Optional[float] = Field(None, description="Execution time in seconds")
+    metadata: ExtractionMetadata = Field(..., description="Comprehensive extraction and document metadata")
+    data: List[SectionItem] = Field(..., description="List of extracted heading-text sections")
+    total_pages: Optional[int] = Field(None, description="Root alias for total pages")
+    processing_time_sec: Optional[float] = Field(None, description="Root alias for duration in seconds")
 
 
 class ErrorResponse(BaseModel):
     success: bool = Field(False, description="Indicates failure")
-    error: str = Field(..., description="Error description")
+    error: str = Field(..., description="Error category description")
     detail: Optional[str] = Field(None, description="Detailed error information")
 
 
@@ -40,13 +54,12 @@ class ErrorResponse(BaseModel):
 app = FastAPI(
     title="ExtractAI PDF Extraction API",
     description="High-performance pipeline converting complex PDF documents into structured heading and body-text pairs.",
-    version="1.0.0",
+    version="2.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
 
 # --- CORS Middleware ---
-# Configured to support Vite / React frontends and external clients
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -61,7 +74,7 @@ def root():
     """Root endpoint providing service metadata."""
     return {
         "service": "ExtractAI PDF Extraction API",
-        "version": "1.0.0",
+        "version": "2.0.0",
         "status": "operational",
         "endpoints": {
             "extract": "POST /api/extract",
@@ -77,7 +90,7 @@ def health_check():
     return {
         "status": "healthy",
         "service": "ExtractAI",
-        "version": "1.0.0"
+        "version": "2.0.0"
     }
 
 
@@ -85,38 +98,35 @@ def health_check():
     "/api/extract",
     response_model=ExtractionResponse,
     responses={
-        400: {"model": ErrorResponse, "description": "Invalid file or non-PDF input"},
-        422: {"model": ErrorResponse, "description": "Unprocessable or corrupt PDF"},
+        400: {"model": ErrorResponse, "description": "No file uploaded or file is empty"},
+        422: {"model": ErrorResponse, "description": "Invalid file format (not a PDF) or corrupt PDF document"},
+        504: {"model": ErrorResponse, "description": "Extraction timeout exceeding 30 seconds"},
         500: {"model": ErrorResponse, "description": "Internal server processing error"}
     },
     tags=["Extraction"]
 )
 async def extract_pdf(
-    file: UploadFile = File(..., description="The PDF file to extract text from"),
+    file: Optional[UploadFile] = File(None, description="The PDF file to extract text from"),
     granularity: str = Query(
         default="major",
         regex="^(major|detailed)$",
-        description="Extraction granularity: 'major' (~5-15 main sections) or 'detailed' (includes subheadings)"
+        description="Extraction granularity: 'major' (primary sections/H1) or 'detailed' (includes subheadings H2/H3)"
     )
 ):
     """
     Extracts structured headings and associated body text from an uploaded PDF.
-    
-    - Accepts multipart/form-data with a PDF file.
-    - Uses pdfplumber with font size/weight and spatial heuristics.
-    - Returns structured JSON with heading + associated text pairs.
-    """
-    # 1. Validate file presence and filename extension
-    if not file.filename:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No filename provided in upload."
-        )
 
-    if not file.filename.lower().endswith(".pdf"):
+    - Accepts multipart/form-data with a PDF file.
+    - Accurately detects H1, H2, H3, numbered sections (e.g. 1, 1.1, 01, 02), and multi-line headings.
+    - Separates headings from body text, preserving paragraph boundaries and pruning empty sections.
+    - Returns structured JSON with complete metadata (pages, duration in ms, language, size) and data.
+    - Limits request execution time to 30 seconds.
+    """
+    # 1. Validate file presence (400: no file uploaded)
+    if file is None or not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid file type '{file.filename}'. Only .pdf files are accepted."
+            detail="No file uploaded. Please upload a valid PDF document."
         )
 
     # 2. Read file contents into memory
@@ -128,25 +138,45 @@ async def extract_pdf(
             detail=f"Failed to read uploaded file: {str(e)}"
         )
 
+    # Check for empty file content (400: empty file)
     if len(content) == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The uploaded file is empty (0 bytes)."
         )
 
-    # 3. Validate PDF magic bytes (%PDF-)
-    if not content.startswith(b"%PDF-"):
+    # 3. Validate PDF extension and magic bytes (422: file is not a PDF)
+    if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The uploaded file does not start with valid PDF header magic bytes ('%PDF-')."
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Invalid file type '{file.filename}'. File is not a PDF. Only .pdf files are accepted."
         )
 
-    # 4. Run extraction engine
+    if not content.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid PDF format. The file does not start with valid PDF magic bytes ('%PDF-')."
+        )
+
+    # 4. Run extraction engine with 30-second timeout guard
     try:
-        result = extract_sections(content, granularity=granularity)
+        result = await asyncio.wait_for(
+            asyncio.to_thread(
+                extract_sections,
+                content,
+                filename=file.filename,
+                granularity=granularity
+            ),
+            timeout=30.0
+        )
         return JSONResponse(
             status_code=status.HTTP_200_OK,
             content=result
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="PDF extraction timed out: request exceeded maximum allowed processing time of 30 seconds."
         )
     except PDFExtractionError as pe:
         raise HTTPException(
