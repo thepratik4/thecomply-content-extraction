@@ -1,6 +1,5 @@
-﻿import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { buildExtractionTimeline } from "../animations/contractTimeline";
-import gsap from "gsap";
 
 /**
  * ContractAnimation (PDF Extraction Edition)
@@ -10,7 +9,7 @@ import gsap from "gsap";
  */
 const ContractAnimation: React.FC = () => {
   const svgRef = useRef<SVGSVGElement>(null);
-  const tlRef  = useRef<gsap.core.Timeline | null>(null);
+  const tlRef  = useRef<ReturnType<typeof buildExtractionTimeline> | null>(null);
 
   useEffect(() => {
     if (!svgRef.current) return;

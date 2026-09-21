@@ -1,5 +1,6 @@
-﻿import React from "react";
+import React from "react";
 import ContractAnimation from "./components/ContractAnimation";
+import PdfExtractor from "./components/PdfExtractor";
 import "./App.css";
 
 const App: React.FC = () => {
@@ -13,14 +14,14 @@ const App: React.FC = () => {
             <span className="nav-logo-text">ExtractAI</span>
           </a>
           <ul className="nav-links">
-            <li><a href="#product">Product</a></li>
+            <li><a href="#extractor">Extractor Studio</a></li>
+            <li><a href="#product">Capabilities</a></li>
             <li><a href="#how-it-works">How it works</a></li>
             <li><a href="#api">API</a></li>
-            <li><a href="#about">About</a></li>
           </ul>
           <div className="nav-cta">
-            <a href="#demo" className="btn btn-ghost">Request demo</a>
-            <a href="#signup" className="btn btn-primary">Get started</a>
+            <a href="#extractor" className="btn btn-ghost">Demo</a>
+            <a href="#extractor" className="btn btn-primary">Extract PDF</a>
           </div>
         </div>
       </nav>
@@ -50,8 +51,8 @@ const App: React.FC = () => {
 
           {/* CTA row */}
           <div className="hero-actions">
-            <a href="#demo" className="btn btn-primary btn-lg">
-              See it in action
+            <a href="#extractor" className="btn btn-primary btn-lg">
+              Try Extractor Studio
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -104,6 +105,9 @@ const App: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* ── Interactive Extractor Workspace ────────────────────────── */}
+      <PdfExtractor />
 
       {/* ── Feature Grid ───────────────────────────────────────────── */}
       <section className="features" id="product">

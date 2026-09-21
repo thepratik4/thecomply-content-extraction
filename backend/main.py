@@ -11,7 +11,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from backend.extractor import PDFExtractionError, extract_sections
+try:
+    from backend.extractor import PDFExtractionError, extract_sections
+except ImportError:
+    from extractor import PDFExtractionError, extract_sections
 
 
 # --- Response Schemas ---
