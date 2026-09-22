@@ -1487,6 +1487,34 @@
 
 .table-scroll-wrap {
   overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll-wrap::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-scroll-wrap::-webkit-scrollbar-track {
+  background: var(--card-subtle-bg, #f4f4f5);
+  border-radius: 3px;
+}
+
+.table-scroll-wrap::-webkit-scrollbar-thumb {
+  background: var(--border-color, #d4d4d8);
+  border-radius: 3px;
+}
+
+.table-scroll-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted, #a1a1aa);
+}
+
+.dark .table-scroll-wrap::-webkit-scrollbar-track {
+  background: #1e1e24;
+}
+
+.dark .table-scroll-wrap::-webkit-scrollbar-thumb {
+  background: #3f3f46;
 }
 
 .results-structured-table {
@@ -1526,8 +1554,15 @@
 .results-structured-table td {
   padding: 10px 14px;
   vertical-align: top;
+  font-size: 13px;
 }
 
+/* Multi-column tables get proper minimum width so content breathes */
+.results-structured-table--multi {
+  min-width: 680px;
+}
+
+/* 2-column key-value tables */
 .td-field-name {
   font-weight: 600;
   color: var(--text-primary, #1a1a1a);
@@ -1541,12 +1576,60 @@
   word-break: break-word;
 }
 
+/* Multi-column cell variants */
+.td-cell-compact {
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text-secondary, #52525b);
+  font-feature-settings: "tnum";
+}
+
+.td-cell-text {
+  min-width: 260px;
+  max-width: 440px;
+  line-height: 1.55;
+  color: var(--text-primary, #1a1a1a);
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.td-cell-regular {
+  min-width: 105px;
+  line-height: 1.45;
+  color: var(--text-secondary, #52525b);
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+/* Ensure table headers keep header styling even if assigned a cell width class */
+.results-structured-table th.td-cell-compact {
+  white-space: nowrap;
+  font-weight: 700;
+  color: var(--text-muted, #71717a);
+}
+
+.results-structured-table th.td-cell-text {
+  font-weight: 700;
+  color: var(--text-muted, #71717a);
+}
+
+.results-structured-table th.td-cell-regular {
+  font-weight: 700;
+  color: var(--text-muted, #71717a);
+}
+
 .dark .results-structured-table thead tr {
   background: #18181c;
   border-bottom: 1px solid #27272a;
 }
 
 .dark .results-structured-table th {
+  color: #a1a1aa;
+}
+
+.dark .results-structured-table th.td-cell-compact,
+.dark .results-structured-table th.td-cell-text,
+.dark .results-structured-table th.td-cell-regular {
   color: #a1a1aa;
 }
 
@@ -1558,11 +1641,14 @@
   background: #1a1a1f;
 }
 
-.dark .td-field-name {
+.dark .td-field-name,
+.dark .td-cell-text {
   color: #f4f4f5;
 }
 
-.dark .td-field-val {
+.dark .td-field-val,
+.dark .td-cell-compact,
+.dark .td-cell-regular {
   color: #d4d4d8;
 }
 

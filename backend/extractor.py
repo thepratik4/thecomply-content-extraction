@@ -337,6 +337,14 @@ def extract_page_tables(page: Any) -> Tuple[List[Dict[str, Any]], List[Tuple[flo
     except Exception:
         found_tables = []
 
+    def clean_table_cell(val: Any) -> str:
+        if val is None:
+            return ""
+        text = re.sub(r'[\r\n\t]+', ' ', str(val))
+        text = re.sub(r'\s{2,}', ' ', text).strip()
+        text = re.sub(r'(\b[A-Za-z]{3,})-\s+([a-z]{2,}\b)', r'\1\2', text)
+        return repair_kerning_artifacts(text)
+
     for table_obj in found_tables:
         try:
             raw = table_obj.extract()
@@ -345,7 +353,7 @@ def extract_page_tables(page: Any) -> Tuple[List[Dict[str, Any]], List[Tuple[flo
 
             cleaned_rows: List[List[str]] = []
             for row in raw:
-                cleaned = [str(cell).strip() if cell is not None else "" for cell in row]
+                cleaned = [clean_table_cell(cell) for cell in row]
                 if any(c for c in cleaned):
                     cleaned_rows.append(cleaned)
 

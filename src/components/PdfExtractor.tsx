@@ -253,6 +253,60 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   );
 }
 
+// Helper: get appropriate column class based on table width and column type
+function getTableCellClass(colName: string, totalCols: number, cIdx: number): string {
+  if (totalCols === 2) {
+    return cIdx === 0 ? "td-field-name" : "td-field-val";
+  }
+  const name = (colName || "").toLowerCase();
+  // Compact columns: dates, status, ids, codes, schedules
+  if (
+    name.includes("date") ||
+    name.includes("status") ||
+    name === "schedule" ||
+    name.includes("code") ||
+    name.includes("id") ||
+    name.includes("type") ||
+    name.includes("page")
+  ) {
+    return "td-cell-compact";
+  }
+  // Descriptive / Text-heavy columns: name, description, title, document, attached
+  if (
+    name.includes("name") ||
+    name.includes("item") ||
+    name.includes("desc") ||
+    name.includes("document") ||
+    name.includes("title") ||
+    name.includes("summary") ||
+    name.includes("text") ||
+    name.includes("comment")
+  ) {
+    return "td-cell-text";
+  }
+  return "td-cell-regular";
+}
+
+// Helper: sanitize cell text from hard newlines & PDF wrapped syllable artifacts
+function formatCellContent(cell: string): string {
+  if (!cell) return "";
+  let cleaned = cell.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim();
+  cleaned = cleaned.replace(/(\b[A-Za-z]{3,})-\s+([a-z]{2,}\b)/g, "$1$2");
+  cleaned = cleaned
+    .replace(/Disapprov\s+ed/gi, "Disapproved")
+    .replace(/DEPENDE\s+NT/gi, "DEPENDENT")
+    .replace(/INSURAN\s+CE/gi, "INSURANCE")
+    .replace(/ACCELER\s+ATED/gi, "ACCELERATED")
+    .replace(/ACCIDEN\s+TAL/gi, "ACCIDENTAL")
+    .replace(/DISMEMB\s+ERMENT/gi, "DISMEMBERMENT")
+    .replace(/CONTRIB\s+UTIONS/gi, "CONTRIBUTIONS")
+    .replace(/EXPECTE\s+D/gi, "EXPECTED")
+    .replace(/GUARAN\s+TEED/gi, "GUARANTEED")
+    .replace(/Superced\s+ed/gi, "Superceded")
+    .replace(/(\d{2}\/\d{2}\/\d{2})\s+(\d{2})/g, "$1$2");
+  return cleaned;
+}
+
 export const PdfExtractor: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -589,7 +643,12 @@ export const PdfExtractor: React.FC = () => {
     let tableText = "";
     if (tables && tables.length > 0) {
       tableText = tables
-        .map((t) => [t.columns.join("\t"), ...t.rows.map((r) => r.join("\t"))].join("\n"))
+        .map((t) =>
+          [
+            t.columns.map((c) => formatCellContent(c)).join("\t"),
+            ...t.rows.map((r) => r.map((c) => formatCellContent(c)).join("\t")),
+          ].join("\n")
+        )
         .join("\n\n");
     }
     const body = [content, tableText].filter(Boolean).join("\n\n");
@@ -622,8 +681,20 @@ export const PdfExtractor: React.FC = () => {
 
   // Copy specific table data as TSV/text
   const handleCopyTable = (tableData: SectionTableData) => {
-    const rows = tableData.keyValues.map((kv) => `${kv.key}\t${kv.value}`);
-    const text = `Field\tValue\n${rows.join("\n")}`;
+    let text = "";
+    if (tableData.realTables && tableData.realTables.length > 0) {
+      const chunks = tableData.realTables.map((tbl) => {
+        const header = tbl.columns.map((c) => formatCellContent(c)).join("\t");
+        const body = tbl.rows
+          .map((row) => row.map((c) => formatCellContent(c)).join("\t"))
+          .join("\n");
+        return `${header}\n${body}`;
+      });
+      text = chunks.join("\n\n");
+    } else {
+      const rows = tableData.keyValues.map((kv) => `${kv.key}\t${kv.value}`);
+      text = `Field\tValue\n${rows.join("\n")}`;
+    }
     navigator.clipboard.writeText(text);
     setCopiedTableId(tableData.sectionId);
     setTimeout(() => setCopiedTableId(null), 1800);
@@ -1272,28 +1343,43 @@ export const PdfExtractor: React.FC = () => {
                                                 margin: "10px 0 16px 0",
                                                 border: "1px solid var(--border-color, #e5e5e8)",
                                                 borderRadius: "6px",
-                                                overflow: "hidden",
+                                                overflowX: "auto",
                                               }}
                                             >
-                                              <table className="results-structured-table">
+                                              <table
+                                                className={`results-structured-table ${
+                                                  tbl.columns.length > 2 ? "results-structured-table--multi" : ""
+                                                }`}
+                                              >
                                                 <thead>
                                                   <tr>
                                                     {tbl.columns.map((col, cIdx) => (
-                                                      <th key={cIdx}>{col || `Col ${cIdx + 1}`}</th>
+                                                      <th
+                                                        key={cIdx}
+                                                        className={getTableCellClass(col, tbl.columns.length, cIdx)}
+                                                      >
+                                                        {col || `Col ${cIdx + 1}`}
+                                                      </th>
                                                     ))}
                                                   </tr>
                                                 </thead>
                                                 <tbody>
                                                   {tbl.rows.map((row, rIdx) => (
                                                     <tr key={rIdx}>
-                                                      {row.map((cell, cIdx) => (
-                                                        <td
-                                                          key={cIdx}
-                                                          className={cIdx === 0 ? "td-field-name" : "td-field-val"}
-                                                        >
-                                                          {highlightMatch(cell, searchQuery)}
-                                                        </td>
-                                                      ))}
+                                                      {row.map((cell, cIdx) => {
+                                                        const colName = tbl.columns[cIdx] || "";
+                                                        const cellClass = getTableCellClass(
+                                                          colName,
+                                                          tbl.columns.length,
+                                                          cIdx
+                                                        );
+                                                        const formatted = formatCellContent(cell);
+                                                        return (
+                                                          <td key={cIdx} className={cellClass}>
+                                                            {highlightMatch(formatted, searchQuery)}
+                                                          </td>
+                                                        );
+                                                      })}
                                                     </tr>
                                                   ))}
                                                 </tbody>
@@ -1494,22 +1580,40 @@ export const PdfExtractor: React.FC = () => {
                               {tData.realTables.length > 0 ? (
                                 tData.realTables.map((tbl, tIdx) => (
                                   <div key={tIdx} className="table-scroll-wrap">
-                                    <table className="results-structured-table">
+                                    <table
+                                      className={`results-structured-table ${
+                                        tbl.columns.length > 2 ? "results-structured-table--multi" : ""
+                                      }`}
+                                    >
                                       <thead>
                                         <tr>
                                           {tbl.columns.map((col, cIdx) => (
-                                            <th key={cIdx}>{col || `Col ${cIdx + 1}`}</th>
+                                            <th
+                                              key={cIdx}
+                                              className={getTableCellClass(col, tbl.columns.length, cIdx)}
+                                            >
+                                              {col || `Col ${cIdx + 1}`}
+                                            </th>
                                           ))}
                                         </tr>
                                       </thead>
                                       <tbody>
                                         {tbl.rows.map((row, rIdx) => (
                                           <tr key={rIdx}>
-                                            {row.map((cell, cIdx) => (
-                                              <td key={cIdx} className={cIdx === 0 ? "td-field-name" : "td-field-val"}>
-                                                {cell}
-                                              </td>
-                                            ))}
+                                            {row.map((cell, cIdx) => {
+                                              const colName = tbl.columns[cIdx] || "";
+                                              const cellClass = getTableCellClass(
+                                                colName,
+                                                tbl.columns.length,
+                                                cIdx
+                                              );
+                                              const formatted = formatCellContent(cell);
+                                              return (
+                                                <td key={cIdx} className={cellClass}>
+                                                  {formatted}
+                                                </td>
+                                              );
+                                            })}
                                           </tr>
                                         ))}
                                       </tbody>
