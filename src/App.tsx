@@ -1,9 +1,161 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import ContractAnimation from "./components/ContractAnimation";
 import PdfExtractor from "./components/PdfExtractor";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "./components/ui/sidebar";
+import { AppSidebar } from "./components/app-sidebar";
 import "./App.css";
 
 const App: React.FC = () => {
+  const [showDashboard, setShowDashboard] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>("studio");
+
+  // Check URL hash on initial load and on hash change
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash === "#extractor" || window.location.hash === "#studio") {
+        setShowDashboard(true);
+      }
+    };
+    handleHash();
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
+
+  // When dashboard is active, render the shadcn sidebar layout
+  if (showDashboard) {
+    return (
+      <SidebarProvider defaultOpen={true}>
+        <AppSidebar
+          activeItem={activeTab}
+          onSelectItem={setActiveTab}
+          onExitDashboard={() => {
+            setShowDashboard(false);
+            window.location.hash = "";
+          }}
+        />
+        <SidebarInset>
+          {/* Dashboard Header with Sidebar Trigger */}
+          <header
+            style={{
+              height: 56,
+              borderBottom: "1px solid #e5e5e8",
+              background: "#ffffff",
+              padding: "0 20px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              position: "sticky",
+              top: 0,
+              zIndex: 30,
+              boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <SidebarTrigger />
+              <div style={{ height: 16, width: 1, background: "#e5e5e8" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>
+                  {activeTab === "studio" && "Extractor Studio"}
+                  {activeTab === "documents" && "Documents"}
+                  {activeTab === "batch" && "Batch Extractions"}
+                  {activeTab === "api" && "API & Webhooks"}
+                  {activeTab === "settings" && "Settings"}
+                </span>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: "#f4f4f5",
+                    color: "#71717a",
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    border: "1px solid #e4e4e7",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  DASHBOARD
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button
+                onClick={() => {
+                  setShowDashboard(false);
+                  window.location.hash = "";
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "#52525b",
+                  background: "#ffffff",
+                  border: "1px solid #e4e4e7",
+                  padding: "6px 12px",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+              >
+                ← Back to Landing Page
+              </button>
+            </div>
+          </header>
+
+          {/* Dashboard Workspace */}
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "#fafafa" }}>
+            {activeTab === "studio" ? (
+              <PdfExtractor />
+            ) : (
+              <div style={{ padding: 40, maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 12,
+                    background: "#ffffff",
+                    border: "1px solid #e4e4e7",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 16px auto",
+                    color: "#e74c3c",
+                  }}
+                >
+                  <span style={{ fontSize: 20, fontWeight: 700 }}>✦</span>
+                </div>
+                <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", marginBottom: 8 }}>
+                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Workspace
+                </h3>
+                <p style={{ fontSize: 13, color: "#71717a", maxWidth: 400, margin: "0 auto 20px auto" }}>
+                  This dashboard module is configured as part of the ExtractAI system.
+                </p>
+                <button
+                  onClick={() => setActiveTab("studio")}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    background: "#1a1a1a",
+                    color: "#ffffff",
+                    border: "none",
+                    cursor: "pointer",
+                  }}
+                >
+                  Go to Extractor Studio
+                </button>
+              </div>
+            )}
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    );
+  }
+
+  // Otherwise, render landing page
   return (
     <div className="page">
       {/* ── Navigation ─────────────────────────────────────────────── */}
@@ -14,14 +166,42 @@ const App: React.FC = () => {
             <span className="nav-logo-text">ExtractAI</span>
           </a>
           <ul className="nav-links">
-            <li><a href="#extractor">Extractor Studio</a></li>
+            <li>
+              <button
+                onClick={() => setShowDashboard(true)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 14,
+                  color: "var(--ink-soft)",
+                  fontWeight: 450,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  padding: 0,
+                }}
+              >
+                Extractor Studio
+              </button>
+            </li>
             <li><a href="#product">Capabilities</a></li>
             <li><a href="#how-it-works">How it works</a></li>
             <li><a href="#api">API</a></li>
           </ul>
           <div className="nav-cta">
-            <a href="#extractor" className="btn btn-ghost">Demo</a>
-            <a href="#extractor" className="btn btn-primary">Extract PDF</a>
+            <button
+              onClick={() => setShowDashboard(true)}
+              className="btn btn-ghost"
+              style={{ cursor: "pointer" }}
+            >
+              Demo
+            </button>
+            <button
+              onClick={() => setShowDashboard(true)}
+              className="btn btn-primary"
+              style={{ cursor: "pointer" }}
+            >
+              Extract PDF
+            </button>
           </div>
         </div>
       </nav>
@@ -51,12 +231,16 @@ const App: React.FC = () => {
 
           {/* CTA row */}
           <div className="hero-actions">
-            <a href="#extractor" className="btn btn-primary btn-lg">
+            <button
+              onClick={() => setShowDashboard(true)}
+              className="btn btn-primary btn-lg"
+              style={{ cursor: "pointer" }}
+            >
               Try Extractor Studio
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-            </a>
+            </button>
             <a href="#how-it-works" className="btn btn-ghost btn-lg">
               How it works
             </a>
