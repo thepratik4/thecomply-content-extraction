@@ -1,0 +1,59 @@
+.shadcn-spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  color: var(--accent-red, #e74c3c);
+  flex-shrink: 0;
+}
+
+.shadcn-spinner-svg {
+  display: block;
+  animation: shadcn-spin 0.75s linear infinite;
+  transform-origin: center;
+}
+
+.shadcn-spinner--xs .shadcn-spinner-svg {
+  width: 12px;
+  height: 12px;
+}
+
+.shadcn-spinner--sm .shadcn-spinner-svg {
+  width: 16px;
+  height: 16px;
+}
+
+.shadcn-spinner--default .shadcn-spinner-svg,
+.shadcn-spinner--md .shadcn-spinner-svg {
+  width: 20px;
+  height: 20px;
+}
+
+.shadcn-spinner--lg .shadcn-spinner-svg {
+  width: 28px;
+  height: 28px;
+}
+
+.shadcn-spinner--xl .shadcn-spinner-svg {
+  width: 36px;
+  height: 36px;
+}
+
+.shadcn-spinner-track {
+  opacity: 0.18;
+}
+
+.shadcn-spinner-arc {
+  opacity: 1;
+  stroke-dasharray: 40, 100;
+  stroke-dashoffset: 0;
+}
+
+@keyframes shadcn-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

@@ -16,6 +16,14 @@ import {
   Loader2,
 } from "lucide-react";
 import { type ExtractedSection, type ExtractedTable } from "../mockData";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item";
+import { Spinner } from "@/components/ui/spinner";
 import "./PdfExtractor.css";
 
 interface ExtractionMeta {
@@ -207,6 +215,11 @@ export const PdfExtractor: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [extractProgress, setExtractProgress] = useState<number>(0);
   const [loadingStep, setLoadingStep] = useState<string>("Analyzing document structure...");
+  const [loadingDetail, setLoadingDetail] = useState<string>(
+    "Analyzing layout hierarchy, font sizes, and character clusters"
+  );
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+  const extractIntervalRef = useRef<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<ExtractedSection[] | null>(null);
   const [rawApiResponse, setRawApiResponse] = useState<any>(null);
@@ -359,17 +372,38 @@ export const PdfExtractor: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setExtractProgress(15);
+    setElapsedSeconds(0);
     setLoadingStep("Processing document layout & extracting headings...");
+    setLoadingDetail("Analyzing layout hierarchy, font sizes, and character clusters");
 
-    const stepTimer1 = setTimeout(() => {
-      setExtractProgress(50);
-      setLoadingStep("Parsing layout hierarchy, font sizes, and character clusters...");
-    }, 300);
+    const startTime = Date.now();
+    if (extractIntervalRef.current) {
+      clearInterval(extractIntervalRef.current);
+    }
 
-    const stepTimer2 = setTimeout(() => {
-      setExtractProgress(85);
-      setLoadingStep("Associating body text and building structured sections...");
-    }, 600);
+    extractIntervalRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      setElapsedSeconds(elapsed);
+
+      setExtractProgress((prev) => {
+        if (prev < 45) return prev + 12;
+        if (prev < 75) return prev + 6;
+        if (prev < 88) return prev + 2;
+        if (prev < 97 && elapsed % 2 === 0) return prev + 1;
+        return prev;
+      });
+
+      if (elapsed >= 18) {
+        setLoadingStep("Finalizing section hierarchy & cleaning metadata...");
+        setLoadingDetail("Structuring nested letters, tables, and document sections");
+      } else if (elapsed >= 10) {
+        setLoadingStep("Extracting multi-page tables & section content...");
+        setLoadingDetail("Parsing column grids, borders, and page headers");
+      } else if (elapsed >= 4) {
+        setLoadingStep("Associating body text and building structured sections...");
+        setLoadingDetail("Analyzing layout hierarchy, font sizes, and character clusters");
+      }
+    }, 800);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -388,8 +422,9 @@ export const PdfExtractor: React.FC = () => {
         });
       }
 
-      clearTimeout(stepTimer1);
-      clearTimeout(stepTimer2);
+      if (extractIntervalRef.current) {
+        clearInterval(extractIntervalRef.current);
+      }
       setExtractProgress(100);
 
       if (!response.ok) {
@@ -461,13 +496,17 @@ export const PdfExtractor: React.FC = () => {
         throw new Error("Unexpected response format from extraction engine.");
       }
     } catch (err: any) {
-      clearTimeout(stepTimer1);
-      clearTimeout(stepTimer2);
+      if (extractIntervalRef.current) {
+        clearInterval(extractIntervalRef.current);
+      }
       console.warn("Extraction failed:", err);
       setError(
         err?.message || "Failed to extract document. Ensure the document is not password protected."
       );
     } finally {
+      if (extractIntervalRef.current) {
+        clearInterval(extractIntervalRef.current);
+      }
       setIsLoading(false);
     }
   };
@@ -749,7 +788,7 @@ export const PdfExtractor: React.FC = () => {
                         </span>
                       ) : isLoading ? (
                         <span className="status-badge status-badge--loading">
-                          <Loader2 size={12} className="spinner-lucide" />
+                          <Spinner size="xs" className="text-current" />
                           Extracting... {extractProgress}%
                         </span>
                       ) : results ? (
@@ -790,7 +829,7 @@ export const PdfExtractor: React.FC = () => {
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 size={13} className="spinner-lucide" />
+                        <Spinner size="sm" className="text-current" />
                         <span>Extracting...</span>
                       </>
                     ) : (
@@ -817,14 +856,28 @@ export const PdfExtractor: React.FC = () => {
               </div>
             )}
 
-            {/* Loading Step Banner */}
+            {/* Loading Step Banner with shadcn Item & Spinner */}
             {isLoading && (
-              <div className="extract-loading-box">
-                <Loader2 size={28} className="spinner-lucide spinner-lucide--large" />
-                <div className="loading-text-wrap">
-                  <p className="loading-step-heading">{loadingStep}</p>
-                  <p className="loading-step-note">Analyzing layout hierarchy, font sizes, and character clusters</p>
-                </div>
+              <div className="extract-loading-container">
+                <Item variant="muted" className="extract-loading-item">
+                  <ItemMedia>
+                    <Spinner size="lg" className="extract-spinner" />
+                  </ItemMedia>
+                  <ItemContent>
+                    <ItemTitle className="extract-loading-title line-clamp-1">
+                      {loadingStep}
+                    </ItemTitle>
+                    <ItemDescription className="extract-loading-desc">
+                      {loadingDetail}
+                    </ItemDescription>
+                  </ItemContent>
+                  <ItemContent className="flex-none justify-end extract-loading-aside">
+                    <span className="extract-loading-percent">{extractProgress}%</span>
+                    {elapsedSeconds > 0 && (
+                      <span className="extract-loading-timer">{elapsedSeconds}s elapsed</span>
+                    )}
+                  </ItemContent>
+                </Item>
               </div>
             )}
 
