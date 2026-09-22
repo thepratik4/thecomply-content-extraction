@@ -90,10 +90,18 @@ export const PdfExtractor: React.FC = () => {
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile.type === "application/pdf" || droppedFile.name.toLowerCase().endsWith(".pdf")) {
+      const lower = droppedFile.name.toLowerCase();
+      if (
+        droppedFile.type === "application/pdf" ||
+        lower.endsWith(".pdf") ||
+        lower.endsWith(".docx") ||
+        lower.endsWith(".doc") ||
+        droppedFile.type.includes("word") ||
+        droppedFile.type.includes("officedocument")
+      ) {
         startUploadAnimation(droppedFile);
       } else {
-        setError("Please upload a valid PDF document (.pdf).");
+        setError("Please upload a valid document (.pdf, .docx, .doc).");
       }
     }
   };
@@ -102,10 +110,18 @@ export const PdfExtractor: React.FC = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0];
-      if (selectedFile.type === "application/pdf" || selectedFile.name.toLowerCase().endsWith(".pdf")) {
+      const lower = selectedFile.name.toLowerCase();
+      if (
+        selectedFile.type === "application/pdf" ||
+        lower.endsWith(".pdf") ||
+        lower.endsWith(".docx") ||
+        lower.endsWith(".doc") ||
+        selectedFile.type.includes("word") ||
+        selectedFile.type.includes("officedocument")
+      ) {
         startUploadAnimation(selectedFile);
       } else {
-        setError("Please select a valid PDF document (.pdf).");
+        setError("Please select a valid document (.pdf, .docx, .doc).");
       }
     }
     if (e.target) {
@@ -295,10 +311,10 @@ export const PdfExtractor: React.FC = () => {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,application/pdf"
+          accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           onChange={handleFileChange}
           className="file-input-hidden"
-          aria-label="Upload PDF File"
+          aria-label="Upload Document"
         />
 
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -323,7 +339,7 @@ export const PdfExtractor: React.FC = () => {
 
               <div className="dropzone-text-group">
                 <p className="dropzone-prompt">
-                  <strong>Drop PDF here</strong>, or{" "}
+                  <strong>Drop document here</strong>, or{" "}
                   <button
                     type="button"
                     className="dropzone-browse-link"
@@ -335,7 +351,7 @@ export const PdfExtractor: React.FC = () => {
                     Browse files
                   </button>
                 </p>
-                <p className="dropzone-subtext">Accepted file type: PDF</p>
+                <p className="dropzone-subtext">Accepted file types: PDF, DOC, DOCX</p>
               </div>
             </div>
 

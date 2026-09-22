@@ -107,7 +107,7 @@ export const DocumentsPage: React.FC = () => {
             justifyContent: "space-between",
             marginBottom: 20,
             paddingBottom: 16,
-            borderBottom: "1px solid #e5e5e8",
+            borderBottom: "1px solid var(--border-color)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -119,9 +119,9 @@ export const DocumentsPage: React.FC = () => {
                 gap: 6,
                 padding: "6px 12px",
                 borderRadius: 6,
-                border: "1px solid #e4e4e7",
-                background: "#ffffff",
-                color: "#18181b",
+                border: "1px solid var(--border-color)",
+                background: "var(--card-subtle-bg, #f4f4f5)",
+                color: "var(--text-primary)",
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: "pointer",
@@ -131,10 +131,10 @@ export const DocumentsPage: React.FC = () => {
               <ArrowLeft size={14} />
               Back to Documents
             </button>
-            <div style={{ height: 16, width: 1, background: "#e5e5e8" }} />
+            <div style={{ height: 16, width: 1, background: "var(--border-color)" }} />
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <FileText size={16} color="#e74c3c" />
-              <span style={{ fontSize: 15, fontWeight: 700, color: "#1a1a1a" }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)" }}>
                 {selectedDoc.fileName}
               </span>
             </div>
@@ -145,9 +145,9 @@ export const DocumentsPage: React.FC = () => {
               style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: "#15803d",
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
+                color: "#16a34a",
+                background: "rgba(22, 163, 74, 0.12)",
+                border: "1px solid rgba(22, 163, 74, 0.25)",
                 padding: "3px 8px",
                 borderRadius: 9999,
                 display: "inline-flex",
@@ -174,33 +174,33 @@ export const DocumentsPage: React.FC = () => {
             display: "flex",
             alignItems: "center",
             gap: 16,
-            background: "#ffffff",
-            border: "1px solid #e5e5e8",
+            background: "var(--card-bg)",
+            border: "1px solid var(--border-color)",
             padding: "10px 16px",
             borderRadius: 8,
             marginBottom: 20,
             fontSize: 12,
-            color: "#71717a",
+            color: "var(--text-muted)",
           }}
         >
           <div>
-            <span style={{ color: "#a1a1aa", marginRight: 4 }}>Uploaded:</span>
-            <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{selectedDoc.uploadDate}</span>
+            <span style={{ color: "var(--text-muted)", marginRight: 4 }}>Uploaded:</span>
+            <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{selectedDoc.uploadDate}</span>
           </div>
-          <span style={{ color: "#e4e4e7" }}>•</span>
+          <span style={{ color: "var(--border-color)" }}>•</span>
           <div>
-            <span style={{ color: "#a1a1aa", marginRight: 4 }}>Sections:</span>
-            <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{selectedDoc.sections.length}</span>
+            <span style={{ color: "var(--text-muted)", marginRight: 4 }}>Sections:</span>
+            <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{selectedDoc.sections.length}</span>
           </div>
-          <span style={{ color: "#e4e4e7" }}>•</span>
+          <span style={{ color: "var(--border-color)" }}>•</span>
           <div>
-            <span style={{ color: "#a1a1aa", marginRight: 4 }}>Pages:</span>
-            <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{selectedDoc.totalPages}</span>
+            <span style={{ color: "var(--text-muted)", marginRight: 4 }}>Pages:</span>
+            <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{selectedDoc.totalPages}</span>
           </div>
-          <span style={{ color: "#e4e4e7" }}>•</span>
+          <span style={{ color: "var(--border-color)" }}>•</span>
           <div>
-            <span style={{ color: "#a1a1aa", marginRight: 4 }}>File size:</span>
-            <span style={{ fontWeight: 600, color: "#1a1a1a" }}>{selectedDoc.fileSize}</span>
+            <span style={{ color: "var(--text-muted)", marginRight: 4 }}>File size:</span>
+            <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{selectedDoc.fileSize}</span>
           </div>
         </div>
 
@@ -214,8 +214,8 @@ export const DocumentsPage: React.FC = () => {
               <article
                 key={section.id}
                 style={{
-                  background: "#ffffff",
-                  border: "1px solid #e5e5e8",
+                  background: "var(--card-bg)",
+                  border: "1px solid var(--border-color)",
                   borderRadius: 8,
                   padding: "16px 20px",
                   boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
@@ -224,8 +224,8 @@ export const DocumentsPage: React.FC = () => {
                     section.level === 2
                       ? "3px solid #cbd5e1"
                       : section.level === 3
-                      ? "3px solid #e4e4e7"
-                      : "1px solid #e5e5e8",
+                      ? "3px solid var(--border-color)"
+                      : "1px solid var(--border-color)",
                 }}
               >
                 {/* Section Meta Strip */}
@@ -254,8 +254,9 @@ export const DocumentsPage: React.FC = () => {
                     <span
                       style={{
                         fontSize: 11,
-                        color: "#71717a",
-                        background: "#f4f4f5",
+                        color: "var(--text-muted)",
+                        background: "var(--card-subtle-bg, #f4f4f5)",
+                        border: "1px solid var(--border-color)",
                         padding: "1px 6px",
                         borderRadius: 4,
                         fontWeight: 500,
@@ -263,7 +264,7 @@ export const DocumentsPage: React.FC = () => {
                     >
                       Page {section.page}
                     </span>
-                    <span style={{ fontSize: 11, color: "#a1a1aa", fontFamily: "monospace" }}>
+                    <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "monospace" }}>
                       {section.char_count} chars
                     </span>
                   </div>
@@ -276,10 +277,10 @@ export const DocumentsPage: React.FC = () => {
                       gap: 4,
                       fontSize: 11,
                       fontWeight: 500,
-                      color: copiedSectionId === section.id ? "#15803d" : "#71717a",
+                      color: copiedSectionId === section.id ? "#15803d" : "var(--text-muted)",
                       background: copiedSectionId === section.id ? "#f0fdf4" : "transparent",
                       border: "1px solid",
-                      borderColor: copiedSectionId === section.id ? "#bbf7d0" : "#e4e4e7",
+                      borderColor: copiedSectionId === section.id ? "#bbf7d0" : "var(--border-color)",
                       padding: "3px 8px",
                       borderRadius: 4,
                       cursor: "pointer",
@@ -305,7 +306,7 @@ export const DocumentsPage: React.FC = () => {
                   style={{
                     fontSize: isH1 ? 15 : 13,
                     fontWeight: isH1 ? 700 : 600,
-                    color: "#1a1a1a",
+                    color: "var(--text-primary)",
                     margin: "0 0 8px 0",
                     lineHeight: 1.3,
                   }}
@@ -317,7 +318,7 @@ export const DocumentsPage: React.FC = () => {
                 <div
                   style={{
                     fontSize: 13,
-                    color: "#52525b",
+                    color: "var(--text-secondary)",
                     lineHeight: 1.5,
                     whiteSpace: "pre-line",
                   }}
@@ -349,11 +350,11 @@ export const DocumentsPage: React.FC = () => {
         }}
       >
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a", margin: "0 0 4px 0" }}>
+          <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: "0 0 4px 0" }}>
             Documents
           </h2>
-          <p style={{ fontSize: 12, color: "#71717a", margin: 0 }}>
-            Previously processed PDF files and their extracted structure.
+          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
+            Previously processed PDF and Word files and their extracted structure.
           </p>
         </div>
 
@@ -361,7 +362,7 @@ export const DocumentsPage: React.FC = () => {
         <div style={{ position: "relative", width: 260 }}>
           <Search
             size={14}
-            color="#a1a1aa"
+            color="var(--text-muted)"
             style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)" }}
           />
           <input
@@ -374,9 +375,9 @@ export const DocumentsPage: React.FC = () => {
               padding: "7px 28px 7px 32px",
               fontSize: 12,
               borderRadius: 6,
-              border: "1px solid #e4e4e7",
-              background: "#ffffff",
-              color: "#1a1a1a",
+              border: "1px solid var(--border-color)",
+              background: "var(--card-bg)",
+              color: "var(--text-primary)",
               outline: "none",
               boxSizing: "border-box",
             }}
@@ -393,7 +394,7 @@ export const DocumentsPage: React.FC = () => {
                 border: "none",
                 cursor: "pointer",
                 padding: 0,
-                color: "#a1a1aa",
+                color: "var(--text-muted)",
                 display: "flex",
                 alignItems: "center",
               }}
@@ -408,8 +409,8 @@ export const DocumentsPage: React.FC = () => {
       {filteredDocs.length > 0 ? (
         <div
           style={{
-            background: "#ffffff",
-            border: "1px solid #e5e5e8",
+            background: "var(--card-bg)",
+            border: "1px solid var(--border-color)",
             borderRadius: 8,
             overflow: "hidden",
             boxShadow: "0 1px 3px rgba(0,0,0,0.02)",
@@ -419,13 +420,13 @@ export const DocumentsPage: React.FC = () => {
             <thead>
               <tr
                 style={{
-                  background: "#fbfbfb",
-                  borderBottom: "1px solid #e5e5e8",
+                  background: "var(--table-head-bg, #fbfbfb)",
+                  borderBottom: "1px solid var(--border-color)",
                   fontSize: 11,
                   fontWeight: 700,
                   textTransform: "uppercase",
                   letterSpacing: "0.05em",
-                  color: "#71717a",
+                  color: "var(--text-muted)",
                 }}
               >
                 <th style={{ padding: "10px 16px" }}>Filename</th>
@@ -474,13 +475,13 @@ export const DocumentsPage: React.FC = () => {
                           style={{
                             margin: 0,
                             fontWeight: 600,
-                            color: "#18181b",
+                            color: "var(--text-primary)",
                             fontSize: 13,
                           }}
                         >
                           {doc.fileName}
                         </p>
-                        <span style={{ fontSize: 11, color: "#a1a1aa", fontFamily: "monospace" }}>
+                        <span style={{ fontSize: 11, color: "var(--text-muted)", fontFamily: "monospace" }}>
                           {doc.fileSize} • {doc.totalPages} pages
                         </span>
                       </div>
@@ -488,7 +489,7 @@ export const DocumentsPage: React.FC = () => {
                   </td>
 
                   {/* Upload Date */}
-                  <td style={{ padding: "12px 16px", color: "#52525b", fontSize: 12 }}>
+                  <td style={{ padding: "12px 16px", color: "var(--text-secondary)", fontSize: 12 }}>
                     {doc.uploadDate}
                   </td>
 
@@ -498,8 +499,9 @@ export const DocumentsPage: React.FC = () => {
                       style={{
                         fontSize: 12,
                         fontWeight: 600,
-                        color: "#18181b",
-                        background: "#f4f4f5",
+                        color: "var(--text-primary)",
+                        background: "var(--card-subtle-bg, #f4f4f5)",
+                        border: "1px solid var(--border-color)",
                         padding: "2px 8px",
                         borderRadius: 4,
                       }}
@@ -514,9 +516,9 @@ export const DocumentsPage: React.FC = () => {
                       style={{
                         fontSize: 11,
                         fontWeight: 600,
-                        color: "#15803d",
-                        background: "#f0fdf4",
-                        border: "1px solid #bbf7d0",
+                        color: "#16a34a",
+                        background: "rgba(22, 163, 74, 0.12)",
+                        border: "1px solid rgba(22, 163, 74, 0.25)",
                         padding: "2px 8px",
                         borderRadius: 9999,
                         display: "inline-flex",
@@ -546,21 +548,11 @@ export const DocumentsPage: React.FC = () => {
                           fontWeight: 600,
                           padding: "5px 12px",
                           borderRadius: 6,
-                          border: "1px solid #e4e4e7",
-                          background: "#ffffff",
-                          color: "#18181b",
+                          border: "1px solid var(--border-color)",
+                          background: "var(--card-subtle-bg, #f4f4f5)",
+                          color: "var(--text-primary)",
                           cursor: "pointer",
                           transition: "all 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "#1a1a1a"
-                          e.currentTarget.style.color = "#ffffff"
-                          e.currentTarget.style.borderColor = "#1a1a1a"
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "#ffffff"
-                          e.currentTarget.style.color = "#18181b"
-                          e.currentTarget.style.borderColor = "#e4e4e7"
                         }}
                       >
                         View
@@ -572,24 +564,14 @@ export const DocumentsPage: React.FC = () => {
                           fontSize: 12,
                           padding: "5px 7px",
                           borderRadius: 6,
-                          border: "1px solid #e4e4e7",
-                          background: "#ffffff",
-                          color: "#71717a",
+                          border: "1px solid var(--border-color)",
+                          background: "transparent",
+                          color: "var(--text-muted)",
                           cursor: "pointer",
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
                           transition: "all 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = "#dc2626"
-                          e.currentTarget.style.borderColor = "#fca5a5"
-                          e.currentTarget.style.background = "#fef2f2"
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = "#71717a"
-                          e.currentTarget.style.borderColor = "#e4e4e7"
-                          e.currentTarget.style.background = "#ffffff"
                         }}
                       >
                         <Trash2 size={13} />
@@ -605,8 +587,8 @@ export const DocumentsPage: React.FC = () => {
         /* Empty State */
         <div
           style={{
-            background: "#ffffff",
-            border: "1px solid #e5e5e8",
+            background: "var(--card-bg)",
+            border: "1px solid var(--border-color)",
             borderRadius: 8,
             padding: "48px 24px",
             textAlign: "center",
@@ -617,20 +599,21 @@ export const DocumentsPage: React.FC = () => {
               width: 44,
               height: 44,
               borderRadius: 10,
-              background: "#f4f4f5",
+              background: "var(--card-subtle-bg, #f4f4f5)",
+              border: "1px solid var(--border-color)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               margin: "0 auto 12px auto",
-              color: "#a1a1aa",
+              color: "var(--text-muted)",
             }}
           >
             <FileText size={20} />
           </div>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "#18181b", margin: "0 0 4px 0" }}>
+          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", margin: "0 0 4px 0" }}>
             No documents found
           </h3>
-          <p style={{ fontSize: 12, color: "#71717a", margin: "0 0 16px 0" }}>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", margin: "0 0 16px 0" }}>
             {searchQuery
               ? `No documents matching "${searchQuery}"`
               : "No previously processed documents are available."}
@@ -643,9 +626,9 @@ export const DocumentsPage: React.FC = () => {
                 fontWeight: 600,
                 padding: "6px 14px",
                 borderRadius: 6,
-                border: "1px solid #e4e4e7",
-                background: "#ffffff",
-                color: "#18181b",
+                border: "1px solid var(--border-color)",
+                background: "var(--card-subtle-bg, #f4f4f5)",
+                color: "var(--text-primary)",
                 cursor: "pointer",
               }}
             >

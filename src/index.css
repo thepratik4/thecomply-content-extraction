@@ -214,7 +214,16 @@ body {
 }
 
 .dark .dropzone-prompt {
+  color: #d4d4d8 !important;
+}
+
+.dark .dropzone-prompt strong {
   color: #f4f4f5 !important;
+}
+
+.dark .dropzone-sub,
+.dark .dropzone-subtext {
+  color: #a1a1aa !important;
 }
 
 /* Compact Document Bar */

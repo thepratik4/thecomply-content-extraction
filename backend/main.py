@@ -145,14 +145,15 @@ async def extract_pdf(
             detail="The uploaded file is empty (0 bytes)."
         )
 
-    # 3. Validate PDF extension and magic bytes (422: file is not a PDF)
-    if not file.filename.lower().endswith(".pdf"):
+    # 3. Validate file extension (.pdf, .docx, .doc)
+    valid_exts = (".pdf", ".docx", ".doc")
+    if not any(file.filename.lower().endswith(ext) for ext in valid_exts):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Invalid file type '{file.filename}'. File is not a PDF. Only .pdf files are accepted."
+            detail=f"Invalid file type '{file.filename}'. Supported formats: .pdf, .docx, .doc."
         )
 
-    if not content.startswith(b"%PDF-"):
+    if file.filename.lower().endswith(".pdf") and not content.startswith(b"%PDF-"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Invalid PDF format. The file does not start with valid PDF magic bytes ('%PDF-')."

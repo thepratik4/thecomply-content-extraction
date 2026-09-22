@@ -254,42 +254,169 @@ def merge_body_lines_preserving_paragraphs(lines: List[str]) -> str:
     return "\n".join(paragraphs)
 
 
+def extract_docx_sections(
+    doc_bytes: bytes,
+    filename: str = "document.docx",
+    granularity: str = "major"
+) -> Dict[str, Any]:
+    """
+    Extracts structured headings and associated body text from .docx and .doc files.
+    """
+    start_time = time.time()
+    file_size_formatted = format_file_size(len(doc_bytes))
+    raw_sections: List[Dict[str, Any]] = []
+
+    try:
+        import docx
+        doc_stream = io.BytesIO(doc_bytes)
+        doc = docx.Document(doc_stream)
+
+        curr_heading: Optional[str] = None
+        curr_level: int = 1
+        curr_body_lines: List[str] = []
+        char_accumulator = 0
+        current_page = 1
+
+        for p in doc.paragraphs:
+            raw_text = p.text.strip()
+            if not raw_text:
+                continue
+
+            char_accumulator += len(raw_text)
+            current_page = max(1, (char_accumulator // 1800) + 1)
+
+            style_name = (p.style.name if p.style else "").lower()
+            level: Optional[int] = None
+
+            if "heading 1" in style_name or "title" in style_name:
+                level = 1
+            elif "heading 2" in style_name or "subtitle" in style_name:
+                level = 2
+            elif "heading 3" in style_name:
+                level = 3
+            else:
+                is_bold = any(run.bold for run in p.runs if run.bold)
+                m_dotted = re.match(r'^(?:Section\s+)?(\d+(?:\.\d+)+)\.?\s+[A-Z]', raw_text)
+                if m_dotted:
+                    level = 3 if m_dotted.group(1).count('.') >= 2 else 2
+                elif re.match(r'^(?:0[1-9]|[1-9]\d?)\.?\s+[A-Z]', raw_text) and is_bold:
+                    level = 1
+                elif is_bold and len(raw_text) < 80 and not raw_text.endswith(':'):
+                    level = 1
+
+            is_valid_heading = False
+            if level is not None:
+                if granularity == "major":
+                    is_valid_heading = (level == 1)
+                else:
+                    is_valid_heading = True
+
+            if is_valid_heading:
+                if curr_heading is not None or curr_body_lines:
+                    raw_sections.append({
+                        "heading": curr_heading if curr_heading else "Introduction",
+                        "level": curr_level,
+                        "page": current_page,
+                        "text": "\n".join(curr_body_lines).strip()
+                    })
+                    curr_body_lines = []
+                curr_heading = raw_text
+                curr_level = level
+            else:
+                curr_body_lines.append(raw_text)
+
+        if curr_heading is not None or curr_body_lines:
+            raw_sections.append({
+                "heading": curr_heading if curr_heading else "Document Content",
+                "level": curr_level,
+                "page": current_page,
+                "text": "\n".join(curr_body_lines).strip()
+            })
+
+    except Exception:
+        # Fallback text extractor for legacy .doc or raw text
+        ascii_strings = re.findall(r'[\x20-\x7E\s]{4,}', doc_bytes.decode('latin-1', errors='ignore'))
+        lines = [s.strip() for s in ascii_strings if len(s.strip()) > 3]
+
+        curr_heading = "Document Content"
+        curr_body: List[str] = []
+        for line_str in lines:
+            if re.match(r'^(?:0[1-9]|[1-9]\d?)\.?\s+[A-Z]', line_str) and len(line_str) < 80:
+                if curr_body:
+                    raw_sections.append({
+                        "heading": curr_heading,
+                        "level": 1,
+                        "page": 1,
+                        "text": "\n".join(curr_body)
+                    })
+                    curr_body = []
+                curr_heading = line_str
+            else:
+                curr_body.append(line_str)
+        if curr_body:
+            raw_sections.append({
+                "heading": curr_heading,
+                "level": 1,
+                "page": 1,
+                "text": "\n".join(curr_body)
+            })
+
+    final_data: List[Dict[str, Any]] = []
+    all_chunks: List[str] = []
+    for idx, s in enumerate(raw_sections, 1):
+        if not s["text"].strip():
+            continue
+        final_data.append({
+            "id": f"section-{idx}",
+            "heading": s["heading"],
+            "level": s["level"],
+            "text": s["text"],
+            "page": s["page"],
+            "char_count": len(s["text"])
+        })
+        all_chunks.append(s["text"])
+
+    if not final_data:
+        final_data = [{
+            "id": "section-1",
+            "heading": "Document Content",
+            "level": 1,
+            "page": 1,
+            "text": "Content extracted from Word document.",
+            "char_count": 37
+        }]
+
+    elapsed_ms = max(1, int(round((time.time() - start_time) * 1000)))
+    total_estimated_pages = max(1, max(s["page"] for s in final_data))
+
+    return {
+        "success": True,
+        "metadata": {
+            "file_name": filename,
+            "file_size": file_size_formatted,
+            "total_pages": total_estimated_pages,
+            "sections_found": len(final_data),
+            "extraction_time_ms": elapsed_ms,
+            "language": detect_language(" ".join(all_chunks))
+        },
+        "data": final_data,
+        "total_pages": total_estimated_pages,
+        "processing_time_sec": round(elapsed_ms / 1000.0, 3)
+    }
+
+
 def extract_sections(
     file_source: Union[str, BinaryIO, bytes],
     filename: str = "document.pdf",
     granularity: str = "major"
 ) -> Dict[str, Any]:
     """
-    Extracts structured headings and associated body text from a PDF.
+    Extracts structured headings and associated body text from a PDF, DOCX, or DOC.
 
     Args:
-        file_source: Path to PDF file, bytes buffer, or file-like object.
+        file_source: Path to document file, bytes buffer, or file-like object.
         filename: Name of the uploaded file for metadata tracking.
         granularity: 'major' (default, primary sections/H1) or 'detailed' (includes H2/H3 subheadings).
-
-    Returns:
-        Structured dictionary matching ExtractAI API contract:
-        {
-            "success": True,
-            "metadata": {
-                "file_name": str,
-                "file_size": str,
-                "total_pages": int,
-                "sections_found": int,
-                "extraction_time_ms": int,
-                "language": str
-            },
-            "data": [
-                {
-                    "id": str,
-                    "heading": str,
-                    "level": int,
-                    "text": str,
-                    "page": int,
-                    "char_count": int
-                }
-            ]
-        }
     """
     start_time = time.time()
 
@@ -303,6 +430,10 @@ def extract_sections(
         pdf_bytes = file_source.read()
 
     file_size_formatted = format_file_size(len(pdf_bytes))
+
+    # Support DOCX and DOC formats
+    if filename.lower().endswith((".docx", ".doc")):
+        return extract_docx_sections(pdf_bytes, filename=filename, granularity=granularity)
 
     # Check cache
     cache_key = f"{hashlib.sha256(pdf_bytes).hexdigest()}:{granularity}"
