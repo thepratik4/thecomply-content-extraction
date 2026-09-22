@@ -43,15 +43,7 @@ export const BatchExtractionPage: React.FC = () => {
   const addFiles = (selectedFiles: FileList | File[]) => {
     const newItems: BatchFileItem[] = []
     Array.from(selectedFiles).forEach((file) => {
-      const lower = file.name.toLowerCase()
-      if (
-        lower.endsWith(".pdf") ||
-        lower.endsWith(".docx") ||
-        lower.endsWith(".doc") ||
-        file.type === "application/pdf" ||
-        file.type.includes("word") ||
-        file.type.includes("officedocument")
-      ) {
+      if (file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf") {
         newItems.push({
           id: `${file.name}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           file,
@@ -219,7 +211,7 @@ export const BatchExtractionPage: React.FC = () => {
             Batch Extractions
           </h2>
           <p style={{ fontSize: 12, color: "var(--text-muted)", margin: 0 }}>
-            Upload multiple PDF or Word documents to extract headings and body text in a single run.
+            Upload multiple PDF documents to extract headings and body text in a single run.
           </p>
         </div>
 
@@ -295,7 +287,7 @@ export const BatchExtractionPage: React.FC = () => {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            accept=".pdf,application/pdf"
             multiple
             style={{ display: "none" }}
             onChange={(e) => {
@@ -313,7 +305,7 @@ export const BatchExtractionPage: React.FC = () => {
           </div>
 
           <div className="dropzone-sub">
-            Accepted file types: PDF, DOC, DOCX · Select multiple files
+            Accepted file type: PDF · Select multiple files
           </div>
         </div>
       </div>
