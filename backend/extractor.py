@@ -1,16 +1,22 @@
 """
-ExtractAI PDF Parser Engine
-Extracts structured heading and body-text pairs using pdfplumber with font-size,
-weight, positional heuristics, numbering patterns, and multi-line heading detection.
+ExtractAI PDF Parser Engine v3.0
+Extracts structured heading and body-text pairs using pdfplumber with:
+  - Font-size, weight, and positional heuristics (H1/H2/H3)
+  - Fingerprint-based repeated page header/footer suppression
+  - Native pdfplumber table extraction (grid + text strategies)
+  - Hierarchy preservation: H2/H3 emitted as ## / ### markdown markers
+  - Spacing artifact normalization (kerning splits + word-boundary collisions)
+  - No content truncation - full section text preserved
 """
 
 import hashlib
 import io
+import copy
 import re
 import threading
 import time
-from collections import Counter, OrderedDict
-from typing import Any, BinaryIO, Dict, List, Optional, Tuple, Union
+from collections import Counter, OrderedDict, defaultdict
+from typing import Any, BinaryIO, Dict, List, Optional, Set, Tuple, Union
 import pdfplumber
 
 
@@ -30,24 +36,14 @@ class ExtractionCache:
         with self._lock:
             if key in self._cache:
                 self._cache.move_to_end(key)
-                # Return copy of cached result so callers don't mutate state
-                entry = self._cache[key]
-                return {
-                    "success": entry["success"],
-                    "metadata": dict(entry["metadata"]),
-                    "data": [dict(s) for s in entry["data"]]
-                }
+                return copy.deepcopy(self._cache[key])
             return None
 
     def set(self, key: str, value: Dict[str, Any]) -> None:
         with self._lock:
             if key in self._cache:
                 self._cache.move_to_end(key)
-            self._cache[key] = {
-                "success": value["success"],
-                "metadata": dict(value["metadata"]),
-                "data": [dict(s) for s in value["data"]]
-            }
+            self._cache[key] = copy.deepcopy(value)
             if len(self._cache) > self.maxsize:
                 self._cache.popitem(last=False)
 
@@ -56,12 +52,10 @@ class ExtractionCache:
             self._cache.clear()
 
 
-# Global LRU extraction cache instance
 _GLOBAL_CACHE = ExtractionCache()
 
 
 def format_file_size(num_bytes: int) -> str:
-    """Formats file size into human-readable representation."""
     if num_bytes < 1024:
         return f"{num_bytes} B"
     elif num_bytes < 1024 * 1024:
@@ -71,10 +65,6 @@ def format_file_size(num_bytes: int) -> str:
 
 
 def detect_language(text: str) -> str:
-    """
-    Heuristic language detection based on common English stopwords.
-    Returns ISO language code (e.g. 'en').
-    """
     sample = text[:1500].lower()
     english_stopwords = {
         "the", "and", "of", "to", "in", "is", "for", "that", "this",
@@ -84,18 +74,77 @@ def detect_language(text: str) -> str:
     if not words:
         return "en"
     matches = sum(1 for w in words if w in english_stopwords)
-    ratio = matches / len(words)
-    return "en" if ratio >= 0.04 else "en"
+    return "en" if (matches / len(words)) >= 0.04 else "en"
+
+
+# ---------------------------------------------------------------------------
+# Fused-word repairs: PDF spacing artifacts where two words got merged.
+# Only unambiguous cases where both halves are real English words.
+# ---------------------------------------------------------------------------
+_FUSED_WORD_MAP: Dict[str, str] = {
+    "asingle": "a single",   "agroup": "a group",    "aresult": "a result",
+    "aform": "a form",       "aplan": "a plan",      "apolicy": "a policy",
+    "arate": "a rate",       "aterm": "a term",      "aset": "a set",
+    "acopy": "a copy",       "achange": "a change",  "aclaim": "a claim",
+    "acase": "a case",       "abenefit": "a benefit","aproduct": "a product",
+    "anotice": "a notice",   "arequest": "a request","astatement": "a statement",
+    "areview": "a review",   "areport": "a report",  "adate": "a date",
+    "atime": "a time",       "aletter": "a letter",  "anew": "a new",
+    "atotal": "a total",     "afile": "a file",      "aperiod": "a period",
+    "apremium": "a premium", "awriting": "a writing",
+    "Iam": "I am",           "Iwas": "I was",        "Ihave": "I have",
+    "Iwill": "I will",       "Ihereby": "I hereby",  "Iunderstand": "I understand",
+    "AD&Dproduct": "AD&D product", "AD&Dcoverage": "AD&D coverage",
+    "AD&Dbenefit": "AD&D benefit", "AD&Dplan": "AD&D plan",
+    "inaccordance": "in accordance", "inaddition": "in addition",
+    "inconjunction": "in conjunction", "inconnection": "in connection",
+    "inresponse": "in response", "incompliance": "in compliance",
+    "inwriting": "in writing",   "inforce": "in force",
+    "inorder": "in order",
+}
+
+_FUSED_PATTERN = re.compile(
+    r'\b(' + '|'.join(re.escape(k) for k in sorted(_FUSED_WORD_MAP, key=len, reverse=True)) + r')\b'
+)
 
 
 def repair_kerning_artifacts(text: str) -> str:
     """
-    Repairs single-letter word splits frequently caused by PDF font encoding/kerning
-    artifacts (e.g., 'T able' -> 'Table', 'F iling' -> 'Filing', 'G eneral' -> 'General').
+    Repairs PDF extraction spacing problems:
+      1. Single-letter kerning splits  (e.g. 'T able' -> 'Table')
+      2. Fused word-boundary collisions (e.g. 'asingle' -> 'a single')
+      3. Capitalised "I" fused to next word (e.g. 'IHave' -> 'I Have')
     """
+    if not text:
+        return text
     repaired = re.sub(r'\b([A-Za-z])\s+([a-z]{2,})\b', r'\1\2', text)
     repaired = re.sub(r'[ \t]+', ' ', repaired)
+    repaired = _FUSED_PATTERN.sub(lambda m: _FUSED_WORD_MAP[m.group(0)], repaired)
+    repaired = re.sub(r'\bI([A-Z][a-z]{1,})\b', r'I \1', repaired)
     return repaired.strip()
+
+
+# ---------------------------------------------------------------------------
+# SERFF page-metadata label patterns that repeat verbatim on every page.
+# ---------------------------------------------------------------------------
+_SERFF_METADATA_PATTERNS: List[re.Pattern] = [
+    re.compile(r'^SERFF\s+Tracking\s+#', re.IGNORECASE),
+    re.compile(r'^State\s+Tracking\s+#', re.IGNORECASE),
+    re.compile(r'^Company\s+Tracking\s+#', re.IGNORECASE),
+    re.compile(r'^TOI/Sub-TOI:', re.IGNORECASE),
+    re.compile(r'^TOI\s*/', re.IGNORECASE),
+    re.compile(r'^Product\s+Name:', re.IGNORECASE),
+    re.compile(r'^Project\s+Name', re.IGNORECASE),
+    re.compile(r'^PDF\s+Pipeline\s+for\s+SERFF', re.IGNORECASE),
+    re.compile(r'^\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}:\d{2}\s+(AM|PM)', re.IGNORECASE),
+]
+
+
+def _matches_serff_pattern(line_text: str) -> bool:
+    for pattern in _SERFF_METADATA_PATTERNS:
+        if pattern.search(line_text):
+            return True
+    return False
 
 
 def is_running_header_or_footer(
@@ -103,48 +152,44 @@ def is_running_header_or_footer(
     top: float,
     page_height: float,
     avg_size: float,
-    modal_size: float
+    modal_size: float,
+    repeated_lines: Optional[Set[str]] = None
 ) -> bool:
-    """Determines whether a line is a running header, page number, or tracking footer."""
-    # Known regulatory / automated tracking headers & footers
-    if "SERFF Tracking #" in line_text or "PDF Pipeline for SERFF" in line_text:
-        return True
+    """Returns True if the line should be excluded as page header/footer/metadata."""
+    stripped = line_text.strip()
 
-    # Top margin running header: top 12% of page with standard or small font
-    if top < (page_height * 0.12) and avg_size <= (modal_size + 0.5):
+    if "SERFF Tracking #" in stripped or "PDF Pipeline for SERFF" in stripped:
         return True
-
-    # Bottom margin running footer: bottom 10% of page with standard or small font
+    if _matches_serff_pattern(stripped):
+        return True
+    if repeated_lines and stripped in repeated_lines:
+        return True
+    if top < (page_height * 0.15) and avg_size <= (modal_size + 0.5):
+        return True
     if top > (page_height * 0.90) and avg_size <= (modal_size + 0.5):
         return True
-
-    # Standalone page number (e.g., "Page 1 of 15" or "- 1 -")
-    if re.match(r'^(page\s+\d+(\s+of\s+\d+)?|\d+|\-\s*\d+\s*\-)$', line_text.strip(), re.IGNORECASE):
+    if re.match(r'^(page\s+\d+(\s+of\s+\d+)?|\d+|\-\s*\d+\s*\-)$', stripped, re.IGNORECASE):
         return True
-
     return False
 
 
 def analyze_font_hierarchy(pdf: pdfplumber.PDF) -> Tuple[float, List[float]]:
     """
-    Calculates the modal body text font size across the document (excluding running
-    headers/footers) and identifies distinct prominent heading font size tiers (> modal_size + 1.2pt).
+    Calculates the modal body text font size and identifies prominent heading size tiers.
     """
     body_chars = [
         c for page in pdf.pages for c in page.chars
-        if not c['text'].isspace() and c['top'] >= page.height * 0.12 and c['top'] <= page.height * 0.90
+        if not c['text'].isspace()
+        and c['top'] >= page.height * 0.15
+        and c['top'] <= page.height * 0.90
     ]
-
     if not body_chars:
-        # Fallback to all non-whitespace chars if body margin had nothing
         body_chars = [c for page in pdf.pages for c in page.chars if not c['text'].isspace()]
-
     if not body_chars:
         return 10.0, []
 
     size_counter = Counter(round(c['size'], 1) for c in body_chars)
     modal_size = size_counter.most_common(1)[0][0]
-    # Filter distinct sizes significantly larger than body text (>= modal_size + 1.2pt)
     larger_sizes = sorted([s for s in size_counter.keys() if s >= modal_size + 1.2], reverse=True)
     return modal_size, larger_sizes
 
@@ -156,46 +201,31 @@ def detect_heading_level(
     modal_size: float,
     larger_sizes: List[float]
 ) -> Optional[int]:
-    """
-    Determines if a line is a heading and returns its level (1, 2, or 3), or None.
-    Uses font size tiers, bold style, positional rules, and numbering patterns.
-    """
+    """Returns heading level (1/2/3) or None for body text."""
     cleaned = line_text.strip()
     if not cleaned or len(cleaned) > 120:
         return None
-
-    # Exclude lines ending with a colon (field labels or list introducers)
     if cleaned.endswith(":"):
         return None
-
-    # Exclude key-value lines with colon in the first half of the line
     if re.search(r'^[A-Za-z0-9\s/\(\)\-]+:\s+', cleaned) and avg_size <= modal_size + 1.0:
         return None
-
-    # Exclude phone numbers or address continuation patterns
     if re.search(r'(\[\s*phone\s*\]|\bext\.|\bsuite\b|\bblvd\b)', cleaned, re.IGNORECASE) and avg_size <= modal_size + 1.0:
         return None
-
-    # Exclude table header bands with multiple column tokens
     if re.search(r'\b(Amount|Date Processed|Transaction|Public Access|Status Date)\b', cleaned) and avg_size <= modal_size + 0.5:
         return None
 
-    # Numbering Pattern 1: Multi-level dotted (e.g. "1.1 Background" -> level 2, "1.1.2 Details" -> level 3)
     num_match_multi = re.match(r'^(?:Section\s+)?(\d+(?:\.\d+)+)\.?\s+[A-Z]', cleaned)
     if num_match_multi:
         dots = num_match_multi.group(1).count('.')
         return 3 if dots >= 2 else 2
 
-    # Numbering Pattern 2: Single-level (e.g. "1. Executive Summary" or "01 Scope" -> level 1)
     num_match_single = re.match(r'^(?:0[1-9]|[1-9]\d?)\.?\s+[A-Z]', cleaned)
     if num_match_single and (avg_size >= modal_size + 0.5 or is_bold):
         return 1
 
-    # Numbering Pattern 3: Explicit Article, Section, Chapter, Part
     if re.match(r'^(?:Section|Article|Part|Chapter)\s+([0-9IVXLCDM]+)[\.:\s]', cleaned, re.IGNORECASE):
         return 1
 
-    # Font size based hierarchy
     if larger_sizes:
         h1_size = larger_sizes[0]
         if avg_size >= h1_size - 0.4:
@@ -207,7 +237,6 @@ def detect_heading_level(
         if is_bold and avg_size >= modal_size + 0.5:
             return 3
     else:
-        # When no large font tier exists, rely on relative scale and bold styling
         if avg_size >= modal_size * 1.3:
             return 1
         elif avg_size >= modal_size * 1.15:
@@ -220,8 +249,8 @@ def detect_heading_level(
 
 def merge_body_lines_preserving_paragraphs(lines: List[str]) -> str:
     """
-    Merges body text lines, joining fragmented sentence wraps with spaces while
-    preserving paragraph boundaries and list items with newline separations.
+    Merges body text lines into paragraphs, preserving blank-line breaks,
+    markdown heading markers (## / ###), list items, and key-value pairs.
     """
     if not lines:
         return ""
@@ -236,10 +265,13 @@ def merge_body_lines_preserving_paragraphs(lines: List[str]) -> str:
                 paragraphs.append(" ".join(current_para))
                 current_para = []
             continue
-
-        # Check if line indicates a distinct new paragraph or key-value entry
-        is_kv_or_list = bool(re.match(r'^([A-Za-z0-9\s/]+:|\-|\*|•|\d+\.)\s+', stripped))
-
+        if stripped.startswith("## ") or stripped.startswith("### "):
+            if current_para:
+                paragraphs.append(" ".join(current_para))
+                current_para = []
+            paragraphs.append(stripped)
+            continue
+        is_kv_or_list = bool(re.match(r'^([A-Za-z0-9\s/\(\)]+:|[\-\*\u2022]|\d+\.)\s+', stripped))
         if is_kv_or_list:
             if current_para:
                 paragraphs.append(" ".join(current_para))
@@ -254,14 +286,102 @@ def merge_body_lines_preserving_paragraphs(lines: List[str]) -> str:
     return "\n".join(paragraphs)
 
 
+def fingerprint_repeated_lines(pdf: pdfplumber.PDF, threshold: int = 3) -> Set[str]:
+    """
+    First-pass scan: returns the set of text lines that appear verbatim on
+    threshold or more distinct pages. These are running headers/footers to suppress.
+    """
+    line_page_set: Dict[str, Set[int]] = defaultdict(set)
+
+    for page_idx, page in enumerate(pdf.pages):
+        try:
+            words = page.extract_words(keep_blank_chars=False)
+        except Exception:
+            continue
+        if not words:
+            continue
+
+        words.sort(key=lambda w: (round(w["top"] / 3.5) * 3.5, w["x0"]))
+        cur_line: List[dict] = []
+        cur_top: Optional[float] = None
+
+        for w in words:
+            if cur_top is None or abs(w["top"] - cur_top) < 3.5:
+                cur_line.append(w)
+                cur_top = w["top"]
+            else:
+                if cur_line:
+                    line_text = " ".join(ww["text"] for ww in cur_line).strip()
+                    if 3 < len(line_text) < 200:
+                        line_page_set[line_text].add(page_idx)
+                cur_line = [w]
+                cur_top = w["top"]
+        if cur_line:
+            line_text = " ".join(ww["text"] for ww in cur_line).strip()
+            if 3 < len(line_text) < 200:
+                line_page_set[line_text].add(page_idx)
+
+    return {line for line, pages in line_page_set.items() if len(pages) >= threshold}
+
+
+def extract_page_tables(page: Any) -> Tuple[List[Dict[str, Any]], List[Tuple[float, float, float, float]]]:
+    """
+    Extract structured tables from a page using pdfplumber native line-based detection.
+    Returns (tables_data, table_bboxes) where bboxes mask out word-line extraction.
+    """
+    tables_data: List[Dict[str, Any]] = []
+    table_bboxes: List[Tuple[float, float, float, float]] = []
+
+    try:
+        found_tables = page.find_tables()
+    except Exception:
+        found_tables = []
+
+    for table_obj in found_tables:
+        try:
+            raw = table_obj.extract()
+            if not raw:
+                continue
+
+            cleaned_rows: List[List[str]] = []
+            for row in raw:
+                cleaned = [str(cell).strip() if cell is not None else "" for cell in row]
+                if any(c for c in cleaned):
+                    cleaned_rows.append(cleaned)
+
+            if not cleaned_rows:
+                continue
+
+            columns = cleaned_rows[0]
+            data_rows = cleaned_rows[1:] if len(cleaned_rows) > 1 else []
+
+            if len(columns) >= 2 and len(data_rows) >= 1:
+                tables_data.append({
+                    "type": "table",
+                    "columns": columns,
+                    "rows": data_rows,
+                })
+                table_bboxes.append(table_obj.bbox)
+        except Exception:
+            continue
+
+    return tables_data, table_bboxes
+
+
+def _word_in_table(word_top: float, word_x0: float, table_bboxes: List[Tuple]) -> bool:
+    """Returns True if a word falls inside any detected table bounding box."""
+    for (tx0, ttop, tx1, tbottom) in table_bboxes:
+        if ttop - 2 <= word_top <= tbottom + 2 and tx0 - 2 <= word_x0 <= tx1 + 2:
+            return True
+    return False
+
+
 def extract_docx_sections(
     doc_bytes: bytes,
     filename: str = "document.docx",
     granularity: str = "major"
 ) -> Dict[str, Any]:
-    """
-    Extracts structured headings and associated body text from .docx and .doc files.
-    """
+    """Extracts structured headings and body text from .docx / .doc files."""
     start_time = time.time()
     file_size_formatted = format_file_size(len(doc_bytes))
     raw_sections: List[Dict[str, Any]] = []
@@ -281,13 +401,10 @@ def extract_docx_sections(
             raw_text = p.text.strip()
             if not raw_text:
                 continue
-
             char_accumulator += len(raw_text)
             current_page = max(1, (char_accumulator // 1800) + 1)
-
             style_name = (p.style.name if p.style else "").lower()
             level: Optional[int] = None
-
             if "heading 1" in style_name or "title" in style_name:
                 level = 1
             elif "heading 2" in style_name or "subtitle" in style_name:
@@ -304,20 +421,14 @@ def extract_docx_sections(
                 elif is_bold and len(raw_text) < 80 and not raw_text.endswith(':'):
                     level = 1
 
-            is_valid_heading = False
-            if level is not None:
-                if granularity == "major":
-                    is_valid_heading = (level == 1)
-                else:
-                    is_valid_heading = True
+            is_valid_heading = (level == 1) if granularity == "major" else (level is not None)
 
             if is_valid_heading:
                 if curr_heading is not None or curr_body_lines:
                     raw_sections.append({
-                        "heading": curr_heading if curr_heading else "Introduction",
-                        "level": curr_level,
-                        "page": current_page,
-                        "text": "\n".join(curr_body_lines).strip()
+                        "heading": curr_heading or "Introduction",
+                        "level": curr_level, "page": current_page,
+                        "text": "\n".join(curr_body_lines).strip(), "tables": []
                     })
                     curr_body_lines = []
                 curr_heading = raw_text
@@ -327,27 +438,22 @@ def extract_docx_sections(
 
         if curr_heading is not None or curr_body_lines:
             raw_sections.append({
-                "heading": curr_heading if curr_heading else "Document Content",
-                "level": curr_level,
-                "page": current_page,
-                "text": "\n".join(curr_body_lines).strip()
+                "heading": curr_heading or "Document Content",
+                "level": curr_level, "page": current_page,
+                "text": "\n".join(curr_body_lines).strip(), "tables": []
             })
 
     except Exception:
-        # Fallback text extractor for legacy .doc or raw text
         ascii_strings = re.findall(r'[\x20-\x7E\s]{4,}', doc_bytes.decode('latin-1', errors='ignore'))
         lines = [s.strip() for s in ascii_strings if len(s.strip()) > 3]
-
         curr_heading = "Document Content"
         curr_body: List[str] = []
         for line_str in lines:
             if re.match(r'^(?:0[1-9]|[1-9]\d?)\.?\s+[A-Z]', line_str) and len(line_str) < 80:
                 if curr_body:
                     raw_sections.append({
-                        "heading": curr_heading,
-                        "level": 1,
-                        "page": 1,
-                        "text": "\n".join(curr_body)
+                        "heading": curr_heading, "level": 1, "page": 1,
+                        "text": "\n".join(curr_body), "tables": []
                     })
                     curr_body = []
                 curr_heading = line_str
@@ -355,10 +461,8 @@ def extract_docx_sections(
                 curr_body.append(line_str)
         if curr_body:
             raw_sections.append({
-                "heading": curr_heading,
-                "level": 1,
-                "page": 1,
-                "text": "\n".join(curr_body)
+                "heading": curr_heading, "level": 1, "page": 1,
+                "text": "\n".join(curr_body), "tables": []
             })
 
     final_data: List[Dict[str, Any]] = []
@@ -367,37 +471,27 @@ def extract_docx_sections(
         if not s["text"].strip():
             continue
         final_data.append({
-            "id": f"section-{idx}",
-            "heading": s["heading"],
-            "level": s["level"],
-            "text": s["text"],
-            "page": s["page"],
-            "char_count": len(s["text"])
+            "id": f"section-{idx}", "heading": s["heading"],
+            "level": s["level"], "text": s["text"],
+            "page": s["page"], "char_count": len(s["text"]), "tables": s.get("tables", [])
         })
         all_chunks.append(s["text"])
 
     if not final_data:
         final_data = [{
-            "id": "section-1",
-            "heading": "Document Content",
-            "level": 1,
-            "page": 1,
-            "text": "Content extracted from Word document.",
-            "char_count": 37
+            "id": "section-1", "heading": "Document Content", "level": 1,
+            "page": 1, "text": "Content extracted from Word document.",
+            "char_count": 37, "tables": []
         }]
 
     elapsed_ms = max(1, int(round((time.time() - start_time) * 1000)))
     total_estimated_pages = max(1, max(s["page"] for s in final_data))
-
     return {
         "success": True,
         "metadata": {
-            "file_name": filename,
-            "file_size": file_size_formatted,
-            "total_pages": total_estimated_pages,
-            "sections_found": len(final_data),
-            "extraction_time_ms": elapsed_ms,
-            "language": detect_language(" ".join(all_chunks))
+            "file_name": filename, "file_size": file_size_formatted,
+            "total_pages": total_estimated_pages, "sections_found": len(final_data),
+            "extraction_time_ms": elapsed_ms, "language": detect_language(" ".join(all_chunks))
         },
         "data": final_data,
         "total_pages": total_estimated_pages,
@@ -411,16 +505,16 @@ def extract_sections(
     granularity: str = "major"
 ) -> Dict[str, Any]:
     """
-    Extracts structured headings and associated body text from a PDF, DOCX, or DOC.
+    Extracts structured headings and body text from a PDF, DOCX, or DOC.
 
-    Args:
-        file_source: Path to document file, bytes buffer, or file-like object.
-        filename: Name of the uploaded file for metadata tracking.
-        granularity: 'major' (default, primary sections/H1) or 'detailed' (includes H2/H3 subheadings).
+    H1 headings become top-level section items (heading + text + tables).
+    H2/H3 headings are emitted as ## / ### markdown markers inside their parent
+    H1 section body so the frontend parseSubsections() can render them as subsections.
+    Tables are extracted structurally and returned in each section's "tables" list.
+    Repeated page headers/footers are suppressed via fingerprinting + SERFF patterns.
     """
     start_time = time.time()
 
-    # Read bytes buffer if needed
     if isinstance(file_source, str):
         with open(file_source, "rb") as f:
             pdf_bytes = f.read()
@@ -431,11 +525,9 @@ def extract_sections(
 
     file_size_formatted = format_file_size(len(pdf_bytes))
 
-    # Support DOCX and DOC formats
     if filename.lower().endswith((".docx", ".doc")):
         return extract_docx_sections(pdf_bytes, filename=filename, granularity=granularity)
 
-    # Check cache
     cache_key = f"{hashlib.sha256(pdf_bytes).hexdigest()}:{granularity}"
     cached_result = _GLOBAL_CACHE.get(cache_key)
     if cached_result is not None:
@@ -451,42 +543,58 @@ def extract_sections(
             if total_pages == 0:
                 raise PDFExtractionError("The PDF document contains 0 pages.")
 
+            # Pass 1: font hierarchy
             modal_size, larger_sizes = analyze_font_hierarchy(pdf)
 
+            # Pass 2: fingerprint repeated page headers/footers
+            repeated_lines: Set[str] = fingerprint_repeated_lines(pdf, threshold=3)
+
+            # Pass 3: main extraction
             raw_sections: List[Dict[str, Any]] = []
             curr_heading: Optional[str] = None
             curr_level: int = 1
             curr_page: int = 1
             curr_body_lines: List[str] = []
+            curr_tables: List[Dict[str, Any]] = []
             has_extracted_any_text = False
 
             for page_idx, page in enumerate(pdf.pages):
                 page_num = page_idx + 1
+
+                # Extract tables and their bboxes from this page
+                page_tables, table_bboxes = extract_page_tables(page)
+
                 words = page.extract_words(
                     extra_attrs=["fontname", "size"],
                     keep_blank_chars=False
                 )
                 if not words:
+                    curr_tables.extend(page_tables)
                     continue
 
-                # Sort words into horizontal lines
+                # Sort and group words into horizontal lines, skipping table regions
                 words.sort(key=lambda w: (round(w["top"] / 3.5) * 3.5, w["x0"]))
                 lines: List[List[dict]] = []
                 cur_line: List[dict] = []
                 cur_top: Optional[float] = None
 
                 for w in words:
+                    if _word_in_table(w["top"], w["x0"], table_bboxes):
+                        continue
                     if cur_top is None or abs(w["top"] - cur_top) < 3.5:
                         cur_line.append(w)
                         cur_top = w["top"]
                     else:
-                        lines.append(cur_line)
+                        if cur_line:
+                            lines.append(cur_line)
                         cur_line = [w]
                         cur_top = w["top"]
                 if cur_line:
                     lines.append(cur_line)
 
-                # Process lines with multi-line heading detection
+                # Tables on this page get associated with the current heading context
+                pending_page_tables = list(page_tables)
+
                 line_idx = 0
                 while line_idx < len(lines):
                     line_words = lines[line_idx]
@@ -496,23 +604,17 @@ def extract_sections(
                     is_bold = any("bold" in w["fontname"].lower() for w in line_words)
                     line_idx += 1
 
-                    if not raw_line or is_running_header_or_footer(raw_line, top, page.height, avg_size, modal_size):
+                    if not raw_line:
+                        continue
+                    if is_running_header_or_footer(raw_line, top, page.height, avg_size, modal_size, repeated_lines):
                         continue
 
                     has_extracted_any_text = True
                     cleaned_line = repair_kerning_artifacts(raw_line)
                     level = detect_heading_level(cleaned_line, avg_size, is_bold, modal_size, larger_sizes)
 
-                    # Determine if this heading should create a section under current granularity
-                    is_valid_heading = False
-                    if level is not None:
-                        if granularity == "major":
-                            is_valid_heading = (level == 1)
-                        else:
-                            is_valid_heading = True
-
-                    if is_valid_heading:
-                        # Check for multi-line heading continuation
+                    if level == 1:
+                        # Multi-line heading continuation
                         while line_idx < len(lines):
                             next_words = lines[line_idx]
                             next_raw = " ".join(w["text"] for w in next_words).strip()
@@ -520,7 +622,6 @@ def extract_sections(
                             next_avg_size = sum(w["size"] for w in next_words) / len(next_words)
                             next_is_bold = any("bold" in w["fontname"].lower() for w in next_words)
                             v_gap = next_top - top
-
                             if (
                                 abs(next_avg_size - avg_size) < 0.8
                                 and next_is_bold == is_bold
@@ -534,77 +635,82 @@ def extract_sections(
                             else:
                                 break
 
-                        # Flush previous section
+                        # Flush previous section (NO deduplication — same heading = separate entry)
                         if curr_heading is not None or curr_body_lines:
                             text_content = merge_body_lines_preserving_paragraphs(curr_body_lines)
-                            if len(text_content) > 5000:
-                                text_content = text_content[:5000].rstrip()
+                            section_tables = list(curr_tables) + pending_page_tables
+                            pending_page_tables = []
                             raw_sections.append({
-                                "heading": curr_heading if curr_heading else "Introduction",
+                                "heading": curr_heading or "Introduction",
                                 "level": curr_level,
                                 "page": curr_page,
                                 "text": text_content,
+                                "tables": section_tables,
                             })
                             curr_body_lines = []
+                            curr_tables = []
 
                         curr_heading = cleaned_line
-                        curr_level = level if level is not None else 1
+                        curr_level = 1
                         curr_page = page_num
+
+                    elif level in (2, 3):
+                        # Emit H2/H3 as markdown markers for frontend subsection parser
+                        prefix = "## " if level == 2 else "### "
+                        curr_body_lines.append(prefix + cleaned_line)
+
                     else:
                         curr_body_lines.append(cleaned_line)
+
+                curr_tables.extend(pending_page_tables)
 
             # Flush final section
             if curr_heading is not None or curr_body_lines:
                 text_content = merge_body_lines_preserving_paragraphs(curr_body_lines)
-                if len(text_content) > 5000:
-                    text_content = text_content[:5000].rstrip()
                 raw_sections.append({
-                    "heading": curr_heading if curr_heading else "Document Content",
+                    "heading": curr_heading or "Document Content",
                     "level": curr_level,
                     "page": curr_page,
                     "text": text_content,
+                    "tables": list(curr_tables),
                 })
 
-            # Handle scanned PDF with 0 extractable text characters
             if not has_extracted_any_text:
                 raise PDFExtractionError(
                     "No selectable text found in the PDF. The document may be scanned or image-only."
                 )
 
-            # Prune empty sections and preamble noise (< 80 chars intro before real headings)
+            # Filter empty sections; allow same-name sections (no dedup)
             filtered_sections: List[Dict[str, Any]] = []
             for s in raw_sections:
-                if not s["text"].strip():
+                has_text = bool(s["text"].strip())
+                has_tables = bool(s.get("tables"))
+                if not has_text and not has_tables:
                     continue
                 if s["heading"] in ("Introduction", "Document Header") and len(s["text"]) < 80 and len(raw_sections) > 1:
                     continue
                 filtered_sections.append(s)
 
-            # Handle case where document had text but no detectable headings
             if not filtered_sections and raw_sections:
-                # Retain the content under a fallback section
                 fallback_text = "\n".join(s["text"] for s in raw_sections if s["text"].strip())
-                if len(fallback_text) > 5000:
-                    fallback_text = fallback_text[:5000].rstrip()
+                all_tables = [t for s in raw_sections for t in s.get("tables", [])]
                 filtered_sections = [{
-                    "heading": "Document Content",
-                    "level": 1,
-                    "page": 1,
-                    "text": fallback_text,
+                    "heading": "Document Content", "level": 1, "page": 1,
+                    "text": fallback_text, "tables": all_tables,
                 }]
 
-            # Build final response with stable sequential IDs
             final_data: List[Dict[str, Any]] = []
             all_text_chunks: List[str] = []
 
             for idx, s in enumerate(filtered_sections, 1):
-                section_item = {
+                section_item: Dict[str, Any] = {
                     "id": f"section-{idx}",
                     "heading": s["heading"],
                     "level": s["level"],
                     "text": s["text"],
                     "page": s["page"],
-                    "char_count": len(s["text"])
+                    "char_count": len(s["text"]),
+                    "tables": s.get("tables", []),
                 }
                 final_data.append(section_item)
                 all_text_chunks.append(s["text"])
@@ -624,14 +730,11 @@ def extract_sections(
                     "language": detected_lang
                 },
                 "data": final_data,
-                # Backward-compatibility aliases
                 "total_pages": total_pages,
                 "processing_time_sec": round(elapsed_ms / 1000.0, 3)
             }
 
-            # Cache the successful extraction
             _GLOBAL_CACHE.set(cache_key, response)
-
             return response
 
     except PDFExtractionError:

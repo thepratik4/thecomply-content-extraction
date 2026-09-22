@@ -5,7 +5,7 @@ heading and body-text pairs with hierarchy metadata.
 """
 
 import asyncio
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -21,10 +21,14 @@ except ImportError:
 class SectionItem(BaseModel):
     id: str = Field(..., description="Unique stable section identifier, e.g., 'section-1'")
     heading: str = Field(..., description="Detected section heading")
-    level: int = Field(1, description="Heading hierarchy level (1 for H1, 2 for H2, 3 for H3)")
-    text: str = Field(..., description="Associated body text under the heading")
+    level: int = Field(1, description="Heading hierarchy level (1=H1, 2=H2, 3=H3)")
+    text: str = Field(..., description="Associated body text; H2/H3 subheadings appear as ## / ### markers")
     page: int = Field(..., description="1-indexed source page where the heading begins")
-    char_count: int = Field(..., description="Character count of associated body text")
+    char_count: int = Field(..., description="Character count of body text")
+    tables: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Structured tables detected on pages belonging to this section"
+    )
 
 
 class ExtractionMetadata(BaseModel):
@@ -168,7 +172,7 @@ async def extract_pdf(
                 filename=file.filename,
                 granularity=granularity
             ),
-            timeout=30.0
+            timeout=90.0
         )
         return JSONResponse(
             status_code=status.HTTP_200_OK,
@@ -177,7 +181,7 @@ async def extract_pdf(
     except asyncio.TimeoutError:
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail="PDF extraction timed out: request exceeded maximum allowed processing time of 30 seconds."
+            detail="PDF extraction timed out: request exceeded maximum allowed processing time of 90 seconds."
         )
     except PDFExtractionError as pe:
         raise HTTPException(

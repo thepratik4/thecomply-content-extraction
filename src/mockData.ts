@@ -1,3 +1,9 @@
+export interface ExtractedTable {
+  type: "table";
+  columns: string[];
+  rows: string[][];
+}
+
 export interface ExtractedSection {
   id: string;
   heading: string;
@@ -5,7 +11,10 @@ export interface ExtractedSection {
   text: string;
   page: number;
   char_count: number;
+  /** Structured tables extracted from pages belonging to this section */
+  tables?: ExtractedTable[];
 }
+
 
 export const MOCK_EXTRACTION_DATA: ExtractedSection[] = [
   {

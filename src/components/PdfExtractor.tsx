@@ -15,7 +15,7 @@ import {
   ArrowRight,
   Loader2,
 } from "lucide-react";
-import { type ExtractedSection } from "../mockData";
+import { type ExtractedSection, type ExtractedTable } from "../mockData";
 import "./PdfExtractor.css";
 
 interface ExtractionMeta {
@@ -47,6 +47,8 @@ interface SectionTableData {
   sectionHeading: string;
   page?: number;
   keyValues: KeyValueRow[];
+  /** Real structured tables returned by the backend extractor */
+  realTables: ExtractedTable[];
 }
 
 // Helper: check if a line is a key-value or field pair
@@ -575,14 +577,18 @@ export const PdfExtractor: React.FC = () => {
       const kvs = lines
         .map(parseKeyValue)
         .filter((kv): kv is KeyValueRow => kv !== null);
+      const realTables: ExtractedTable[] = Array.isArray(sec.tables)
+        ? (sec.tables as ExtractedTable[])
+        : [];
 
-      if (kvs.length > 0) {
+      if (kvs.length > 0 || realTables.length > 0) {
         tables.push({
           sectionIndex: idx,
           sectionId: sec.id || `section-${idx}`,
           sectionHeading: sec.heading,
           page: sec.page,
           keyValues: kvs,
+          realTables,
         });
       }
     });
@@ -982,6 +988,11 @@ export const PdfExtractor: React.FC = () => {
                                   <span className="explorer-item-heading" title={section.heading}>
                                     {highlightMatch(section.heading, searchQuery)}
                                   </span>
+                                  {section.tables && section.tables.length > 0 && (
+                                    <span className="explorer-item-table-badge" title="Contains tables">
+                                      <Table2 size={10} />
+                                    </span>
+                                  )}
                                   {section.page && (
                                     <span className="explorer-item-page">p. {section.page}</span>
                                   )}
@@ -1243,8 +1254,9 @@ export const PdfExtractor: React.FC = () => {
                                     <span className="table-card-page">Page {tData.page}</span>
                                   )}
                                   <span className="table-card-count">
-                                    {tData.keyValues.length}{" "}
-                                    {tData.keyValues.length === 1 ? "field" : "fields"}
+                                    {tData.realTables.length > 0
+                                      ? `${tData.realTables.length} table${tData.realTables.length === 1 ? "" : "s"}`
+                                      : `${tData.keyValues.length} ${tData.keyValues.length === 1 ? "field" : "fields"}`}
                                   </span>
                                 </div>
 
@@ -1268,24 +1280,53 @@ export const PdfExtractor: React.FC = () => {
                                 </button>
                               </div>
 
-                              <div className="table-scroll-wrap">
-                                <table className="results-structured-table">
-                                  <thead>
-                                    <tr>
-                                      <th style={{ width: "35%" }}>Field</th>
-                                      <th>Value</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {tData.keyValues.map((kv, rIdx) => (
-                                      <tr key={rIdx}>
-                                        <td className="td-field-name">{kv.key}</td>
-                                        <td className="td-field-val">{kv.value}</td>
+                              {/* Real structured tables from the backend */}
+                              {tData.realTables.length > 0 ? (
+                                tData.realTables.map((tbl, tIdx) => (
+                                  <div key={tIdx} className="table-scroll-wrap">
+                                    <table className="results-structured-table">
+                                      <thead>
+                                        <tr>
+                                          {tbl.columns.map((col, cIdx) => (
+                                            <th key={cIdx}>{col || `Col ${cIdx + 1}`}</th>
+                                          ))}
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {tbl.rows.map((row, rIdx) => (
+                                          <tr key={rIdx}>
+                                            {row.map((cell, cIdx) => (
+                                              <td key={cIdx} className={cIdx === 0 ? "td-field-name" : "td-field-val"}>
+                                                {cell}
+                                              </td>
+                                            ))}
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ))
+                              ) : (
+                                /* Fallback: KV pair table from text parsing */
+                                <div className="table-scroll-wrap">
+                                  <table className="results-structured-table">
+                                    <thead>
+                                      <tr>
+                                        <th style={{ width: "35%" }}>Field</th>
+                                        <th>Value</th>
                                       </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
+                                    </thead>
+                                    <tbody>
+                                      {tData.keyValues.map((kv, rIdx) => (
+                                        <tr key={rIdx}>
+                                          <td className="td-field-name">{kv.key}</td>
+                                          <td className="td-field-val">{kv.value}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
