@@ -3,6 +3,7 @@ import ContractAnimation from "./components/ContractAnimation";
 import PdfExtractor from "./components/PdfExtractor";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "./components/ui/sidebar";
 import { AppSidebar } from "./components/app-sidebar";
+import { DocumentsPage } from "./components/DocumentsPage";
 import "./App.css";
 
 const App: React.FC = () => {
@@ -108,6 +109,8 @@ const App: React.FC = () => {
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "#fafafa" }}>
             {activeTab === "studio" ? (
               <PdfExtractor />
+            ) : activeTab === "documents" ? (
+              <DocumentsPage />
             ) : (
               <div style={{ padding: 40, maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
                 <div
