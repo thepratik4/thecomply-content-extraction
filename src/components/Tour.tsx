@@ -8,7 +8,16 @@ import React, {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, ArrowRight, Check, Sparkles, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  Check,
+  FileText,
+  GripVertical,
+  Sparkles,
+  X,
+} from "lucide-react";
 import "./Tour.css";
 
 export interface TourStep {
@@ -297,6 +306,94 @@ export const TourProvider: React.FC<TourProviderProps> = ({
                 }}
               />
             )}
+
+            {/* Step 1: Floating Draggable Sample PDF & Path Guide */}
+            {currentStep?.id === "step-upload" && elementRect && (() => {
+              const samplePillWidth = 270;
+              const samplePillHeight = 48;
+              const pillTop = Math.max(16, elementRect.top - 72);
+              const pillLeft = Math.max(
+                20,
+                Math.min(
+                  window.innerWidth - samplePillWidth - 20,
+                  elementRect.left + elementRect.width / 2 - samplePillWidth / 2
+                )
+              );
+              const startX = pillLeft + samplePillWidth / 2;
+              const startY = pillTop + samplePillHeight;
+              const endX = elementRect.left + elementRect.width / 2;
+              const endY = Math.min(elementRect.top + 45, elementRect.top + elementRect.height / 2);
+              const controlY = (startY + endY) / 2;
+              const badgeX = (startX + endX) / 2;
+              const badgeY = (startY + endY) / 2;
+
+              return (
+                <div className="tour-drag-guide-layer">
+                  {/* Curved animated arrow path */}
+                  <svg className="tour-drag-path-svg">
+                    <defs>
+                      <marker
+                        id="tour-arrowhead"
+                        markerWidth="8"
+                        markerHeight="8"
+                        refX="4"
+                        refY="4"
+                        orient="auto"
+                      >
+                        <polygon points="0 1, 7 4, 0 7" fill="#2563eb" />
+                      </marker>
+                    </defs>
+                    <path
+                      d={`M ${startX} ${startY} Q ${startX} ${controlY}, ${endX} ${endY}`}
+                      stroke="#2563eb"
+                      strokeWidth="2.5"
+                      strokeDasharray="6,5"
+                      fill="none"
+                      className="tour-animated-dash"
+                      markerEnd="url(#tour-arrowhead)"
+                    />
+                  </svg>
+
+                  {/* Floating Path Badge */}
+                  <div
+                    className="tour-drag-path-badge"
+                    style={{ left: badgeX, top: badgeY }}
+                  >
+                    <ArrowDown size={13} />
+                    <span>Drag PDF here (or click)</span>
+                  </div>
+
+                  {/* Floating Draggable Sample PDF */}
+                  <div
+                    className="tour-floating-sample-card"
+                    style={{ top: pillTop, left: pillLeft }}
+                    draggable={true}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("application/extractai-sample", "true");
+                      e.dataTransfer.effectAllowed = "copy";
+                    }}
+                    onClick={() => {
+                      window.dispatchEvent(new CustomEvent("extractai:load-sample"));
+                    }}
+                    title="Drag this sample into the dropzone or click to load"
+                  >
+                    <div className="tour-floating-grip">
+                      <GripVertical size={14} />
+                    </div>
+                    <div className="tour-floating-icon">
+                      <FileText size={17} />
+                    </div>
+                    <div className="tour-floating-details">
+                      <span className="tour-floating-filename">AMGN-135003565.pdf</span>
+                      <span className="tour-floating-meta">Sample PDF • 142 KB</span>
+                    </div>
+                    <div className="tour-floating-action-badge">
+                      <span>Drag to drop</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Floating Callout Card */}
             {currentStep && (

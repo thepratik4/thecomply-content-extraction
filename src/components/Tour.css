@@ -305,3 +305,165 @@
   background: rgba(59, 130, 246, 0.22);
   border-color: rgba(59, 130, 246, 0.45);
 }
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Step 1: Floating Draggable Sample PDF & Path Guide
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.tour-drag-guide-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.tour-drag-path-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+@keyframes tour-dash-flow {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.tour-animated-dash {
+  animation: tour-dash-flow 0.8s linear infinite;
+}
+
+@keyframes tour-levitate {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+    box-shadow: 0 10px 25px -4px rgba(37, 99, 235, 0.3), 0 0 0 1.5px rgba(37, 99, 235, 0.4);
+  }
+  50% {
+    transform: translateY(-7px) scale(1.01);
+    box-shadow: 0 18px 36px -6px rgba(37, 99, 235, 0.42), 0 0 0 2px rgba(37, 99, 235, 0.6);
+  }
+}
+
+.tour-floating-sample-card {
+  position: absolute;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px 8px 10px;
+  background: #ffffff;
+  border-radius: 12px;
+  cursor: grab;
+  user-select: none;
+  animation: tour-levitate 3s ease-in-out infinite;
+  transition: transform 0.15s ease, filter 0.15s ease;
+  z-index: 10001;
+}
+
+.tour-floating-sample-card:hover {
+  filter: brightness(1.03);
+}
+
+.tour-floating-sample-card:active {
+  cursor: grabbing;
+  transform: scale(0.97) !important;
+}
+
+.dark .tour-floating-sample-card {
+  background: #1e1e24;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.tour-floating-grip {
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+}
+
+.tour-floating-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(225, 29, 72, 0.12);
+  color: #e11d48;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tour-floating-details {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+
+.tour-floating-filename {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.dark .tour-floating-filename {
+  color: #f8fafc;
+}
+
+.tour-floating-meta {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.tour-floating-action-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(37, 99, 235, 0.1);
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2563eb;
+  margin-left: 6px;
+}
+
+.dark .tour-floating-action-badge {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
+
+.tour-drag-path-badge {
+  position: absolute;
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  transform: translate(-50%, -50%);
+  animation: tour-bounce-path 1.8s ease-in-out infinite;
+  white-space: nowrap;
+}
+
+@keyframes tour-bounce-path {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(0px);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(4px);
+  }
+}

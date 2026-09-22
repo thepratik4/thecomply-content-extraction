@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import ContractAnimation from "./components/ContractAnimation";
 import PdfExtractor from "./components/PdfExtractor";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "./components/ui/sidebar";
@@ -8,7 +8,8 @@ import { BatchExtractionPage } from "./components/BatchExtractionPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { ModeToggle } from "./components/mode-toggle";
 import { TourProvider, useTour, type TourStep } from "./components/Tour";
-import { Sparkles } from "lucide-react";
+import { TourConfirmModal } from "./components/TourConfirmModal";
+import { ArrowRight, Sparkles } from "lucide-react";
 import "./App.css";
 
 const TOUR_STEPS: TourStep[] = [
@@ -82,15 +83,18 @@ const TOUR_STEPS: TourStep[] = [
   },
 ];
 
-const TourTriggerButton: React.FC<{ onSwitchTab?: () => void }> = ({ onSwitchTab }) => {
-  const { startTour, isActive } = useTour();
+const TourTriggerButton: React.FC<{
+  onSwitchTab?: () => void;
+  onRequestTour?: () => void;
+}> = ({ onSwitchTab, onRequestTour }) => {
+  const { isActive } = useTour();
   return (
     <button
       type="button"
       className="btn-tour-trigger"
       onClick={() => {
         onSwitchTab?.();
-        startTour();
+        onRequestTour?.();
       }}
       title="Start interactive guided tour"
     >
@@ -104,18 +108,8 @@ const DashboardContent: React.FC<{
   activeTab: string;
   setActiveTab: (tab: string) => void;
   setShowDashboard: (show: boolean) => void;
-}> = ({ activeTab, setActiveTab, setShowDashboard }) => {
-  const { startTour } = useTour();
-
-  // Listen for external trigger to start tour (e.g. from Landing page)
-  useEffect(() => {
-    const handleStartTour = () => {
-      setActiveTab("studio");
-      startTour();
-    };
-    window.addEventListener("extractai:start-tour", handleStartTour);
-    return () => window.removeEventListener("extractai:start-tour", handleStartTour);
-  }, [setActiveTab, startTour]);
+  onRequestTour: () => void;
+}> = ({ activeTab, setActiveTab, setShowDashboard, onRequestTour }) => {
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -172,7 +166,10 @@ const DashboardContent: React.FC<{
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <TourTriggerButton onSwitchTab={() => setActiveTab("studio")} />
+            <TourTriggerButton
+              onSwitchTab={() => setActiveTab("studio")}
+              onRequestTour={onRequestTour}
+            />
             <ModeToggle />
             <button
               onClick={() => {
@@ -256,9 +253,11 @@ const DashboardContent: React.FC<{
   );
 };
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
+  const { startTour } = useTour();
   const [showDashboard, setShowDashboard] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>("studio");
+  const [showTourConfirmModal, setShowTourConfirmModal] = useState<boolean>(false);
 
   // Check URL hash on initial load and on hash change
   useEffect(() => {
@@ -272,13 +271,37 @@ const App: React.FC = () => {
     return () => window.removeEventListener("hashchange", handleHash);
   }, []);
 
+  const handleRequestTour = useCallback(() => {
+    const hasWork = Boolean((window as any).__extractai_has_work);
+    if (hasWork) {
+      setShowTourConfirmModal(true);
+    } else {
+      setShowDashboard(true);
+      setActiveTab("studio");
+      startTour();
+    }
+  }, [startTour]);
+
+  const handleConfirmTour = useCallback(() => {
+    setShowTourConfirmModal(false);
+    window.dispatchEvent(new CustomEvent("extractai:reset-workspace"));
+    setShowDashboard(true);
+    setActiveTab("studio");
+    startTour();
+  }, [startTour]);
+
+  const handleCancelTourModal = useCallback(() => {
+    setShowTourConfirmModal(false);
+  }, []);
+
   return (
-    <TourProvider defaultSteps={TOUR_STEPS}>
+    <>
       {showDashboard ? (
         <DashboardContent
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           setShowDashboard={setShowDashboard}
+          onRequestTour={handleRequestTour}
         />
       ) : (
         <div className="page">
@@ -300,32 +323,6 @@ const App: React.FC = () => {
 
               <div className="nav-cta">
                 <ModeToggle />
-                <button
-                  onClick={() => {
-                    setShowDashboard(true);
-                    setActiveTab("studio");
-                    setTimeout(() => {
-                      window.dispatchEvent(new CustomEvent("extractai:start-tour"));
-                    }, 150);
-                  }}
-                  className="btn btn-ghost"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
-                >
-                  <Sparkles size={13} style={{ color: "var(--color-accent, #2563eb)" }} />
-                  Guided Tour
-                </button>
-                <button
-                  onClick={() => setShowDashboard(true)}
-                  className="btn btn-ghost"
-                >
-                  Guest Sign In
-                </button>
-                <button
-                  onClick={() => setShowDashboard(true)}
-                  className="btn btn-primary"
-                >
-                  Extract PDF
-                </button>
               </div>
             </div>
           </nav>
@@ -359,30 +356,15 @@ const App: React.FC = () => {
               onClick={() => setShowDashboard(true)}
               className="btn btn-primary btn-lg"
             >
-              Try Extractor Studio
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <span>Try Extractor Studio</span>
+              <ArrowRight size={16} />
             </button>
             <button
-              onClick={() => {
-                setShowDashboard(true);
-                setActiveTab("studio");
-                setTimeout(() => {
-                  window.dispatchEvent(new CustomEvent("extractai:start-tour"));
-                }, 150);
-              }}
-              className="btn btn-ghost btn-lg"
-              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              onClick={handleRequestTour}
+              className="btn btn-hero-tour btn-lg"
             >
-              <Sparkles size={15} style={{ color: "var(--color-accent, #2563eb)" }} />
-              Guided Tour
-            </button>
-            <button
-              onClick={() => setShowDashboard(true)}
-              className="btn btn-ghost btn-lg"
-            >
-              Guest Sign In
+              <Sparkles size={16} />
+              <span>Guided Tour</span>
             </button>
           </div>
         </div>
@@ -455,7 +437,22 @@ const App: React.FC = () => {
       </footer>
     </div>
   )}
-</TourProvider>
+
+    {/* Tour Restart Confirmation Dialog */}
+    <TourConfirmModal
+      isOpen={showTourConfirmModal}
+      onConfirm={handleConfirmTour}
+      onCancel={handleCancelTourModal}
+    />
+  </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <TourProvider defaultSteps={TOUR_STEPS}>
+      <AppContent />
+    </TourProvider>
   );
 };
 

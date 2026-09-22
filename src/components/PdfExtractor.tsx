@@ -489,6 +489,33 @@ export const PdfExtractor: React.FC = () => {
     return () => window.removeEventListener("extractai:load-sample", onExternalLoadSample);
   }, []);
 
+  // Track whether there is active work in progress for Tour restart confirmation
+  useEffect(() => {
+    (window as any).__extractai_has_work = Boolean(file || results);
+    return () => {
+      (window as any).__extractai_has_work = false;
+    };
+  }, [file, results]);
+
+  // Listen for reset workspace trigger (e.g. from Tour restart confirmation)
+  useEffect(() => {
+    const handleReset = () => {
+      setFile(null);
+      setResults(null);
+      setRawApiResponse(null);
+      setMeta(null);
+      setError(null);
+      setIsLoading(false);
+      setIsUploading(false);
+      setSearchQuery("");
+      setSelectedSectionIndex(0);
+      setExpandedSubsections({});
+      (window as any).__extractai_has_work = false;
+    };
+    window.addEventListener("extractai:reset-workspace", handleReset);
+    return () => window.removeEventListener("extractai:reset-workspace", handleReset);
+  }, []);
+
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
@@ -505,6 +532,15 @@ export const PdfExtractor: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+
+    // Check if sample document from Guided Tour was dropped
+    if (
+      e.dataTransfer.types.includes("application/extractai-sample") ||
+      e.dataTransfer.getData("application/extractai-sample")
+    ) {
+      handleLoadSample();
+      return;
+    }
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFile = e.dataTransfer.files[0];
