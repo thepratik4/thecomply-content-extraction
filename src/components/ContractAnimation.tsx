@@ -55,7 +55,7 @@ const ContractAnimation: React.FC = () => {
           <text
             x="240" y="354" textAnchor="middle"
             fontFamily="Inter, sans-serif" fontSize="8.5" fill="#a8a8a8" letterSpacing="0.04em"
-          >PDF · DOCX · TXT supported</text>
+          >PDF documents supported</text>
         </g>
 
         {/* ═══════════════════════════════════════════════════
