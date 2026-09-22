@@ -4,6 +4,7 @@ import PdfExtractor from "./components/PdfExtractor";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "./components/ui/sidebar";
 import { AppSidebar } from "./components/app-sidebar";
 import { DocumentsPage } from "./components/DocumentsPage";
+import { BatchExtractionPage } from "./components/BatchExtractionPage";
 import "./App.css";
 
 const App: React.FC = () => {
@@ -111,6 +112,8 @@ const App: React.FC = () => {
               <PdfExtractor />
             ) : activeTab === "documents" ? (
               <DocumentsPage />
+            ) : activeTab === "batch" ? (
+              <BatchExtractionPage />
             ) : (
               <div style={{ padding: 40, maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
                 <div
