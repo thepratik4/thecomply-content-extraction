@@ -168,47 +168,33 @@ const App: React.FC = () => {
   // Otherwise, render landing page
   return (
     <div className="page">
-      {/* ── Navigation ─────────────────────────────────────────────── */}
+      {/* ── Navigation (Simple, clean top bar matching Thecomply.ai) ──── */}
       <nav className="nav">
         <div className="nav-inner">
-          <a href="/" className="nav-logo">
-            <span className="nav-logo-mark">E</span>
-            <span className="nav-logo-text">ExtractAI</span>
+          <a
+            href="/"
+            className="nav-logo"
+            onClick={(e) => {
+              e.preventDefault();
+              setShowDashboard(false);
+              window.location.hash = "";
+            }}
+          >
+            <span className="nav-logo-square" />
+            <span className="nav-logo-text">Thecomply.ai</span>
           </a>
-          <ul className="nav-links">
-            <li>
-              <button
-                onClick={() => setShowDashboard(true)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: 14,
-                  color: "var(--ink-soft)",
-                  fontWeight: 450,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  padding: 0,
-                }}
-              >
-                Extractor Studio
-              </button>
-            </li>
-            <li><a href="#product">Capabilities</a></li>
-            <li><a href="#how-it-works">How it works</a></li>
-          </ul>
-          <div className="nav-cta" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+
+          <div className="nav-cta">
             <ModeToggle />
             <button
               onClick={() => setShowDashboard(true)}
               className="btn btn-ghost"
-              style={{ cursor: "pointer" }}
             >
-              Demo
+              Guest Sign In
             </button>
             <button
               onClick={() => setShowDashboard(true)}
               className="btn btn-primary"
-              style={{ cursor: "pointer" }}
             >
               Extract PDF
             </button>
@@ -244,24 +230,18 @@ const App: React.FC = () => {
             <button
               onClick={() => setShowDashboard(true)}
               className="btn btn-primary btn-lg"
-              style={{ cursor: "pointer" }}
             >
               Try Extractor Studio
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-            <a href="#how-it-works" className="btn btn-ghost btn-lg">
-              How it works
-            </a>
-          </div>
-
-          {/* Output format hint */}
-          <div className="output-hint">
-            <span className="output-hint-label">Output format</span>
-            <code className="output-hint-code">
-              {"{ heading: string, text: string }[]"}
-            </code>
+            <button
+              onClick={() => setShowDashboard(true)}
+              className="btn btn-ghost btn-lg"
+            >
+              Guest Sign In
+            </button>
           </div>
         </div>
 
