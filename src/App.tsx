@@ -7,7 +7,254 @@ import { DocumentsPage } from "./components/DocumentsPage";
 import { BatchExtractionPage } from "./components/BatchExtractionPage";
 import { SettingsPage } from "./components/SettingsPage";
 import { ModeToggle } from "./components/mode-toggle";
+import { TourProvider, useTour, type TourStep } from "./components/Tour";
+import { Sparkles } from "lucide-react";
 import "./App.css";
+
+const TOUR_STEPS: TourStep[] = [
+  {
+    id: "step-upload",
+    selectorId: "tour-dropzone",
+    title: "1. Upload & File Selection",
+    description:
+      "Drop any insurance or regulatory PDF filing here, or browse files from your computer. Our layout engine analyzes font sizes, styles, and character clusters to separate headings from body text.",
+    position: "bottom",
+    actionText: "Load Sample Document (AMGN-135003565.pdf)",
+    onAction: () => {
+      window.dispatchEvent(new CustomEvent("extractai:load-sample"));
+    },
+  },
+  {
+    id: "step-navigator",
+    selectorId: "tour-navigator",
+    title: "2. Document Structure & H1 Hierarchy",
+    description:
+      "Browse the complete document hierarchy. The extraction pipeline programmatically distinguishes prominent headings from body paragraphs and regulatory boilerplate, complete with page numbers and character counts.",
+    position: "right",
+  },
+  {
+    id: "step-traceability",
+    selectorId: "tour-traceability",
+    title: "3. Source Traceability & Audit Trail",
+    description:
+      "Every extracted section has clear provenance. Compliance analysts can click 'View source' to open the original uploaded PDF directly at the relevant page for instant verification.",
+    position: "bottom",
+  },
+  {
+    id: "step-section-actions",
+    selectorId: "tour-section-actions",
+    title: "4. Section Controls & Quick Copy",
+    description:
+      "Use 'Collapse all / Expand all' to quickly scan sub-clauses and provisions, or click 'Copy' to copy the current section's heading and body text to clipboard.",
+    position: "bottom",
+  },
+  {
+    id: "step-view-tabs",
+    selectorId: "tour-view-tabs",
+    title: "5. Multi-View Explorer & Structured Tables",
+    description:
+      "Switch between Structured Explorer, a dedicated Tables View (isolating filing schedules with responsive columns and 1-click TSV copy for Excel), and raw JSON code view.",
+    position: "bottom",
+  },
+  {
+    id: "step-export-actions",
+    selectorId: "tour-export-actions",
+    title: "6. Bulk Copy & JSON Export",
+    description:
+      "Copy all extracted sections as structured text or download the full API JSON payload to integrate with downstream regulatory and compliance workflows.",
+    position: "bottom",
+  },
+  {
+    id: "step-search",
+    selectorId: "tour-search",
+    title: "7. Real-Time Search & Match Highlighting",
+    description:
+      "Instantly search across all extracted headings, body paragraphs, and table rows with highlighted query matches.",
+    position: "bottom",
+  },
+  {
+    id: "step-batch-nav",
+    selectorId: "tour-batch-nav",
+    title: "8. Enterprise Batch Processing",
+    description:
+      "Scale to large compliance workloads. The Batch Extractions suite allows you to upload and process dozens of filings concurrently with queue monitoring and bulk downloads.",
+    position: "right",
+  },
+];
+
+const TourTriggerButton: React.FC<{ onSwitchTab?: () => void }> = ({ onSwitchTab }) => {
+  const { startTour, isActive } = useTour();
+  return (
+    <button
+      type="button"
+      className="btn-tour-trigger"
+      onClick={() => {
+        onSwitchTab?.();
+        startTour();
+      }}
+      title="Start interactive guided tour"
+    >
+      <Sparkles size={13} />
+      <span>{isActive ? "Tour Active" : "Guided Tour"}</span>
+    </button>
+  );
+};
+
+const DashboardContent: React.FC<{
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  setShowDashboard: (show: boolean) => void;
+}> = ({ activeTab, setActiveTab, setShowDashboard }) => {
+  const { startTour } = useTour();
+
+  // Listen for external trigger to start tour (e.g. from Landing page)
+  useEffect(() => {
+    const handleStartTour = () => {
+      setActiveTab("studio");
+      startTour();
+    };
+    window.addEventListener("extractai:start-tour", handleStartTour);
+    return () => window.removeEventListener("extractai:start-tour", handleStartTour);
+  }, [setActiveTab, startTour]);
+
+  return (
+    <SidebarProvider defaultOpen={true}>
+      <AppSidebar
+        activeItem={activeTab}
+        onSelectItem={setActiveTab}
+        onExitDashboard={() => {
+          setShowDashboard(false);
+          window.location.hash = "";
+        }}
+      />
+      <SidebarInset>
+        {/* Dashboard Header with Sidebar Trigger */}
+        <header
+          style={{
+            height: 56,
+            borderBottom: "1px solid var(--border-color, #e5e5e8)",
+            background: "var(--card-bg, #ffffff)",
+            padding: "0 16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            position: "sticky",
+            top: 0,
+            zIndex: 30,
+            boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <SidebarTrigger />
+            <div style={{ height: 16, width: 1, background: "var(--border-color, #e5e5e8)" }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary, #1a1a1a)" }}>
+                {activeTab === "studio" && "Extractor Studio"}
+                {activeTab === "documents" && "Documents"}
+                {activeTab === "batch" && "Batch Extractions"}
+                {activeTab === "settings" && "Settings"}
+              </span>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  background: "var(--card-subtle-bg, #f4f4f5)",
+                  color: "var(--text-muted, #71717a)",
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  border: "1px solid var(--border-color, #e4e4e7)",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                DASHBOARD
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <TourTriggerButton onSwitchTab={() => setActiveTab("studio")} />
+            <ModeToggle />
+            <button
+              onClick={() => {
+                setShowDashboard(false);
+                window.location.hash = "";
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--text-secondary, #52525b)",
+                background: "var(--card-bg, #ffffff)",
+                border: "1px solid var(--border-color, #e4e4e7)",
+                padding: "6px 12px",
+                borderRadius: 6,
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              ← Back to Landing Page
+            </button>
+          </div>
+        </header>
+
+        {/* Dashboard Workspace */}
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "var(--app-bg, #fafafa)" }}>
+          {activeTab === "studio" ? (
+            <PdfExtractor />
+          ) : activeTab === "documents" ? (
+            <DocumentsPage />
+          ) : activeTab === "batch" ? (
+            <BatchExtractionPage />
+          ) : activeTab === "settings" ? (
+            <SettingsPage />
+          ) : (
+            <div style={{ padding: 40, maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
+              <div
+                style={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: 12,
+                  background: "#ffffff",
+                  border: "1px solid #e4e4e7",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px auto",
+                  color: "#e74c3c",
+                }}
+              >
+                <span style={{ fontSize: 20, fontWeight: 700 }}>✦</span>
+              </div>
+              <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", marginBottom: 8 }}>
+                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Workspace
+              </h3>
+              <p style={{ fontSize: 13, color: "#71717a", maxWidth: 400, margin: "0 auto 20px auto" }}>
+                This dashboard module is configured as part of the ExtractAI system.
+              </p>
+              <button
+                onClick={() => setActiveTab("studio")}
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  padding: "8px 16px",
+                  borderRadius: 8,
+                  background: "#1a1a1a",
+                  color: "#ffffff",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Go to Extractor Studio
+              </button>
+            </div>
+          )}
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+};
 
 const App: React.FC = () => {
   const [showDashboard, setShowDashboard] = useState<boolean>(false);
@@ -25,182 +272,63 @@ const App: React.FC = () => {
     return () => window.removeEventListener("hashchange", handleHash);
   }, []);
 
-  // When dashboard is active, render the shadcn sidebar layout
-  if (showDashboard) {
-    return (
-      <SidebarProvider defaultOpen={true}>
-        <AppSidebar
-          activeItem={activeTab}
-          onSelectItem={setActiveTab}
-          onExitDashboard={() => {
-            setShowDashboard(false);
-            window.location.hash = "";
-          }}
+  return (
+    <TourProvider defaultSteps={TOUR_STEPS}>
+      {showDashboard ? (
+        <DashboardContent
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          setShowDashboard={setShowDashboard}
         />
-        <SidebarInset>
-          {/* Dashboard Header with Sidebar Trigger */}
-          <header
-            style={{
-              height: 56,
-              borderBottom: "1px solid var(--border-color, #e5e5e8)",
-              background: "var(--header-bg, #ffffff)",
-              padding: "0 20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              position: "sticky",
-              top: 0,
-              zIndex: 30,
-              boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <SidebarTrigger />
-              <div style={{ height: 16, width: 1, background: "var(--border-color, #e5e5e8)" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary, #1a1a1a)" }}>
-                  {activeTab === "studio" && "Extractor Studio"}
-                  {activeTab === "documents" && "Documents"}
-                  {activeTab === "batch" && "Batch Extractions"}
-                  {activeTab === "settings" && "Settings"}
-                </span>
-                <span
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    background: "var(--card-subtle-bg, #f4f4f5)",
-                    color: "var(--text-muted, #71717a)",
-                    padding: "2px 6px",
-                    borderRadius: 4,
-                    border: "1px solid var(--border-color, #e4e4e7)",
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  DASHBOARD
-                </span>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <ModeToggle />
-              <button
-                onClick={() => {
+      ) : (
+        <div className="page">
+          {/* ── Navigation (Simple, clean top bar matching Thecomply.ai) ──── */}
+          <nav className="nav">
+            <div className="nav-inner">
+              <a
+                href="/"
+                className="nav-logo"
+                onClick={(e) => {
+                  e.preventDefault();
                   setShowDashboard(false);
                   window.location.hash = "";
                 }}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  color: "var(--text-secondary, #52525b)",
-                  background: "var(--card-bg, #ffffff)",
-                  border: "1px solid var(--border-color, #e4e4e7)",
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  cursor: "pointer",
-                  transition: "all 0.15s ease",
-                }}
               >
-                ← Back to Landing Page
-              </button>
-            </div>
-          </header>
+                <span className="nav-logo-square" />
+                <span className="nav-logo-text">Thecomply.ai</span>
+              </a>
 
-          {/* Dashboard Workspace */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "var(--app-bg, #fafafa)" }}>
-            {activeTab === "studio" ? (
-              <PdfExtractor />
-            ) : activeTab === "documents" ? (
-              <DocumentsPage />
-            ) : activeTab === "batch" ? (
-              <BatchExtractionPage />
-            ) : activeTab === "settings" ? (
-              <SettingsPage />
-            ) : (
-              <div style={{ padding: 40, maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
-                <div
-                  style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 12,
-                    background: "#ffffff",
-                    border: "1px solid #e4e4e7",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 16px auto",
-                    color: "#e74c3c",
-                  }}
-                >
-                  <span style={{ fontSize: 20, fontWeight: 700 }}>✦</span>
-                </div>
-                <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", marginBottom: 8 }}>
-                  {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Workspace
-                </h3>
-                <p style={{ fontSize: 13, color: "#71717a", maxWidth: 400, margin: "0 auto 20px auto" }}>
-                  This dashboard module is configured as part of the ExtractAI system.
-                </p>
+              <div className="nav-cta">
+                <ModeToggle />
                 <button
-                  onClick={() => setActiveTab("studio")}
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    padding: "8px 16px",
-                    borderRadius: 8,
-                    background: "#1a1a1a",
-                    color: "#ffffff",
-                    border: "none",
-                    cursor: "pointer",
+                  onClick={() => {
+                    setShowDashboard(true);
+                    setActiveTab("studio");
+                    setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent("extractai:start-tour"));
+                    }, 150);
                   }}
+                  className="btn btn-ghost"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5 }}
                 >
-                  Go to Extractor Studio
+                  <Sparkles size={13} style={{ color: "var(--color-accent, #2563eb)" }} />
+                  Guided Tour
+                </button>
+                <button
+                  onClick={() => setShowDashboard(true)}
+                  className="btn btn-ghost"
+                >
+                  Guest Sign In
+                </button>
+                <button
+                  onClick={() => setShowDashboard(true)}
+                  className="btn btn-primary"
+                >
+                  Extract PDF
                 </button>
               </div>
-            )}
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
-    );
-  }
-
-  // Otherwise, render landing page
-  return (
-    <div className="page">
-      {/* ── Navigation (Simple, clean top bar matching Thecomply.ai) ──── */}
-      <nav className="nav">
-        <div className="nav-inner">
-          <a
-            href="/"
-            className="nav-logo"
-            onClick={(e) => {
-              e.preventDefault();
-              setShowDashboard(false);
-              window.location.hash = "";
-            }}
-          >
-            <span className="nav-logo-square" />
-            <span className="nav-logo-text">Thecomply.ai</span>
-          </a>
-
-          <div className="nav-cta">
-            <ModeToggle />
-            <button
-              onClick={() => setShowDashboard(true)}
-              className="btn btn-ghost"
-            >
-              Guest Sign In
-            </button>
-            <button
-              onClick={() => setShowDashboard(true)}
-              className="btn btn-primary"
-            >
-              Extract PDF
-            </button>
-          </div>
-        </div>
-      </nav>
+            </div>
+          </nav>
 
       {/* ── Hero ───────────────────────────────────────────────────── */}
       <section className="hero">
@@ -235,6 +363,20 @@ const App: React.FC = () => {
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
+            </button>
+            <button
+              onClick={() => {
+                setShowDashboard(true);
+                setActiveTab("studio");
+                setTimeout(() => {
+                  window.dispatchEvent(new CustomEvent("extractai:start-tour"));
+                }, 150);
+              }}
+              className="btn btn-ghost btn-lg"
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Sparkles size={15} style={{ color: "var(--color-accent, #2563eb)" }} />
+              Guided Tour
             </button>
             <button
               onClick={() => setShowDashboard(true)}
@@ -312,6 +454,8 @@ const App: React.FC = () => {
         </div>
       </footer>
     </div>
+  )}
+</TourProvider>
   );
 };
 

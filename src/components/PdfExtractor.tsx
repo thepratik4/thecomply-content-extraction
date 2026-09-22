@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Loader2,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import { type ExtractedSection, type ExtractedTable } from "../mockData";
 import {
@@ -426,10 +427,13 @@ export const PdfExtractor: React.FC = () => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  // Upload simulation for smooth UI transition
+  // Upload simulation for smooth UI transition then immediate automatic extraction
   const startUploadAnimation = (selectedFile: File) => {
     if (uploadTimerRef.current) {
       clearInterval(uploadTimerRef.current);
+    }
+    if (extractIntervalRef.current) {
+      clearInterval(extractIntervalRef.current);
     }
 
     setFile(selectedFile);
@@ -445,16 +449,18 @@ export const PdfExtractor: React.FC = () => {
 
     let progress = 0;
     uploadTimerRef.current = setInterval(() => {
-      progress += Math.floor(Math.random() * 9) + 6;
+      progress += Math.floor(Math.random() * 18) + 14;
       if (progress >= 100) {
         progress = 100;
         setUploadProgress(100);
         setIsUploading(false);
         clearInterval(uploadTimerRef.current);
+        // Automatically start extraction immediately
+        handleExtract(selectedFile);
       } else {
         setUploadProgress(progress);
       }
-    }, 45);
+    }, 35);
   };
 
   const handleLoadSample = async () => {
@@ -473,6 +479,15 @@ export const PdfExtractor: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  // Listen for external trigger to load sample document (e.g. from Guided Tour)
+  useEffect(() => {
+    const onExternalLoadSample = () => {
+      handleLoadSample();
+    };
+    window.addEventListener("extractai:load-sample", onExternalLoadSample);
+    return () => window.removeEventListener("extractai:load-sample", onExternalLoadSample);
+  }, []);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -524,8 +539,9 @@ export const PdfExtractor: React.FC = () => {
   };
 
   // Run extraction via POST /api/extract
-  const handleExtract = async () => {
-    if (!file) {
+  const handleExtract = async (fileToExtract?: File) => {
+    const targetFile = fileToExtract || file;
+    if (!targetFile) {
       setError("Please select a document first.");
       return;
     }
@@ -567,7 +583,7 @@ export const PdfExtractor: React.FC = () => {
     }, 800);
 
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", targetFile);
 
     try {
       let response: Response;
@@ -612,8 +628,8 @@ export const PdfExtractor: React.FC = () => {
           processingTimeSec: m.extraction_time_ms
             ? m.extraction_time_ms / 1000
             : json.processing_time_sec,
-          fileName: m.file_name ?? file.name,
-          fileSize: m.file_size ?? formatFileSize(file.size),
+          fileName: m.file_name ?? targetFile.name,
+          fileSize: m.file_size ?? formatFileSize(targetFile.size),
           sectionsFound: m.sections_found ?? json.data.length,
           language: m.language ?? "en",
         });
@@ -623,7 +639,7 @@ export const PdfExtractor: React.FC = () => {
           try {
             const docRecord = {
               id: `doc-${Date.now()}`,
-              fileName: m.file_name ?? file.name,
+              fileName: m.file_name ?? targetFile.name,
               uploadDate: new Date().toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -631,7 +647,7 @@ export const PdfExtractor: React.FC = () => {
               }),
               sectionsCount: json.data.length,
               totalPages: m.total_pages ?? json.total_pages ?? 1,
-              fileSize: m.file_size ?? formatFileSize(file.size),
+              fileSize: m.file_size ?? formatFileSize(targetFile.size),
               status: "Processed",
               sections: json.data,
             };
@@ -639,7 +655,7 @@ export const PdfExtractor: React.FC = () => {
               localStorage.getItem("extractai_processed_documents") || "[]"
             );
             const filtered = existing.filter(
-              (d: any) => d.fileName !== (m.file_name ?? file.name)
+              (d: any) => d.fileName !== (m.file_name ?? targetFile.name)
             );
             localStorage.setItem(
               "extractai_processed_documents",
@@ -872,7 +888,7 @@ export const PdfExtractor: React.FC = () => {
             STATE 1: No document selected → Upload zone
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         {!file && (
-          <div className="upload-wrapper">
+          <div id="tour-dropzone" className="upload-wrapper">
             <div
               className={`dropzone ${isDragging ? "dropzone--dragging" : ""}`}
               onDragOver={handleDragOver}
@@ -990,10 +1006,14 @@ export const PdfExtractor: React.FC = () => {
                           <CheckCircle2 size={13} className="status-icon-check" />
                           <span>Extracted</span>
                         </span>
+                      ) : error ? (
+                        <span className="status-badge" style={{ color: "var(--destructive, #ef4444)" }}>
+                          <span>Extraction failed</span>
+                        </span>
                       ) : (
-                        <span className="status-badge status-badge--ready">
-                          <CheckCircle2 size={13} className="status-icon-check" />
-                          <span>Ready to extract</span>
+                        <span className="status-badge status-badge--loading">
+                          <Spinner size="xs" className="text-current" />
+                          <span>Starting extraction...</span>
                         </span>
                       )}
                     </span>
@@ -1014,24 +1034,15 @@ export const PdfExtractor: React.FC = () => {
                   <span>Change file</span>
                 </button>
 
-                {!results && (
+                {error && !isLoading && (
                   <button
                     type="button"
-                    className={`btn-extract-primary ${isLoading ? "btn-extract-primary--loading" : ""}`}
-                    onClick={handleExtract}
-                    disabled={isLoading || isUploading}
+                    className="btn-extract-primary"
+                    onClick={() => handleExtract()}
+                    title="Retry extraction"
                   >
-                    {isLoading ? (
-                      <>
-                        <Spinner size="sm" className="text-current" />
-                        <span>Extracting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Extract Document</span>
-                        <ArrowRight size={14} />
-                      </>
-                    )}
+                    <RefreshCw size={13} />
+                    <span>Retry</span>
                   </button>
                 )}
               </div>
@@ -1103,7 +1114,7 @@ export const PdfExtractor: React.FC = () => {
 
                     <div className="results-header-controls">
                       {/* View Switcher Tabs: [ Structured ] [ Tables ] [ JSON ] */}
-                      <div className="results-view-tabs" role="tablist">
+                      <div id="tour-view-tabs" className="results-view-tabs" role="tablist">
                         <button
                           type="button"
                           role="tab"
@@ -1137,7 +1148,7 @@ export const PdfExtractor: React.FC = () => {
                       </div>
 
                       {/* Header Actions */}
-                      <div className="results-button-actions">
+                      <div id="tour-export-actions" className="results-button-actions">
                         <button
                           type="button"
                           className="btn-results-action"
@@ -1174,9 +1185,9 @@ export const PdfExtractor: React.FC = () => {
                   {viewMode === "structured" && (
                     <div className="document-explorer">
                       {/* LEFT: Section Navigator */}
-                      <aside className="explorer-nav-panel">
+                      <aside id="tour-navigator" className="explorer-nav-panel">
                         {/* Search sections */}
-                        <div className="explorer-search-box">
+                        <div id="tour-search" className="explorer-search-box">
                           <Search size={14} className="explorer-search-icon" />
                           <input
                             type="text"
@@ -1267,7 +1278,7 @@ export const PdfExtractor: React.FC = () => {
                           <article className="section-detail-card">
                             {/* Section Header */}
                             <div className="section-detail-header">
-                              <div className="section-detail-meta">
+                              <div id="tour-traceability" className="section-detail-meta">
                                 <span className="section-badge-num">
                                   SECTION {String(selectedSectionIndex + 1).padStart(2, "0")}
                                 </span>
@@ -1301,7 +1312,7 @@ export const PdfExtractor: React.FC = () => {
                                   {highlightMatch(selectedSection.heading, searchQuery)}
                                 </h2>
 
-                                <div className="section-header-actions">
+                                <div id="tour-section-actions" className="section-header-actions">
                                   {currentSubsections.length > 1 && (
                                     <button
                                       type="button"
