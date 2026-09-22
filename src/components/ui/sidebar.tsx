@@ -11,7 +11,6 @@ import { PanelLeft } from "lucide-react"
 import "./sidebar.css"
 
 /* ─── Constants ──────────────────────────────────────────── */
-const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
