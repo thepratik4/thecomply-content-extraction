@@ -110,6 +110,24 @@ export const BatchExtractionPage: React.FC = () => {
 
       const json = await res.json()
       if (json.success && Array.isArray(json.data)) {
+        try {
+          const docRecord = {
+            id: `doc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            fileName: json.metadata?.file_name ?? item.name,
+            uploadDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            sectionsCount: json.data.length,
+            totalPages: json.metadata?.total_pages ?? json.total_pages ?? 1,
+            fileSize: json.metadata?.file_size ?? formatFileSize(item.size),
+            status: "Processed",
+            sections: json.data,
+          }
+          const existing = JSON.parse(localStorage.getItem("extractai_processed_documents") || "[]")
+          const filtered = existing.filter((d: any) => d.fileName !== (json.metadata?.file_name ?? item.name))
+          localStorage.setItem("extractai_processed_documents", JSON.stringify([docRecord, ...filtered]))
+        } catch {
+          // ignore storage error
+        }
+
         return {
           ...item,
           status: "completed",

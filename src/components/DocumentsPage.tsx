@@ -12,8 +12,9 @@ import {
   Calendar,
   Clock,
   X,
+  Trash2,
 } from "lucide-react"
-import { MOCK_EXTRACTION_DATA, type ExtractedSection } from "../mockData"
+import { type ExtractedSection } from "../mockData"
 
 /* ─── Types ──────────────────────────────────────────────── */
 export interface ProcessedDocument {
@@ -26,160 +27,6 @@ export interface ProcessedDocument {
   status: "Processed" | "Completed"
   sections: ExtractedSection[]
 }
-
-/* ─── Realistic Mock Documents ────────────────────────────── */
-const MOCK_DOCUMENTS: ProcessedDocument[] = [
-  {
-    id: "doc-1",
-    fileName: "AMGN-135003565.pdf",
-    uploadDate: "Sep 21, 2026",
-    sectionsCount: 11,
-    totalPages: 15,
-    fileSize: "30.2 KB",
-    status: "Processed",
-    sections: MOCK_EXTRACTION_DATA,
-  },
-  {
-    id: "doc-2",
-    fileName: "Maryland-SOV-Annuity-Filing.pdf",
-    uploadDate: "Sep 18, 2026",
-    sectionsCount: 8,
-    totalPages: 12,
-    fileSize: "48.5 KB",
-    status: "Processed",
-    sections: [
-      {
-        id: "sov-1",
-        heading: "1. Statement of Variability Summary",
-        level: 1,
-        page: 1,
-        text: "This filing contains revised Statement of Variability specifications for group non-variable annuity products submitted under Maryland Insurance Code § 16-102.",
-        char_count: 172,
-      },
-      {
-        id: "sov-2",
-        heading: "1.1 General Product Classification",
-        level: 2,
-        page: 2,
-        text: "Sub-TOI: A05G.000 Annuities - Immediate Non-variable. Primary carrier: American General Life Insurance Company. Market Type: Employer Group.",
-        char_count: 148,
-      },
-      {
-        id: "sov-3",
-        heading: "2. Contract Variable Provisions",
-        level: 1,
-        page: 4,
-        text: "Variable language provisions across contract specification pages, payout frequency options, guaranteed interest floor, and death benefit riders.",
-        char_count: 154,
-      },
-      {
-        id: "sov-4",
-        heading: "2.1 Interest Guarantee Thresholds",
-        level: 2,
-        page: 5,
-        text: "Guaranteed minimum rate is fixed at 2.75% per annum for the initial five-year policy period, subject to statutory standard non-forfeiture minimums.",
-        char_count: 152,
-      },
-      {
-        id: "sov-5",
-        heading: "3. Redline Version Comparison",
-        level: 1,
-        page: 8,
-        text: "Enclosed redline document P 22550-I highlights 4 textual modifications reflecting state review recommendations from examiner correspondence.",
-        char_count: 146,
-      },
-    ],
-  },
-  {
-    id: "doc-3",
-    fileName: "Corebridge-Master-Agreement.pdf",
-    uploadDate: "Sep 14, 2026",
-    sectionsCount: 6,
-    totalPages: 9,
-    fileSize: "112.4 KB",
-    status: "Processed",
-    sections: [
-      {
-        id: "cba-1",
-        heading: "Section 1: Parties and Scope",
-        level: 1,
-        page: 1,
-        text: "This Master Services Agreement is entered into between Corebridge Financial Inc. and authorized enterprise distribution partners.",
-        char_count: 136,
-      },
-      {
-        id: "cba-2",
-        heading: "Section 2: Regulatory Compliance Obligations",
-        level: 1,
-        page: 3,
-        text: "Both parties agree to adhere to applicable FINRA and state insurance department disclosure rules regarding product documentation and customer notices.",
-        char_count: 158,
-      },
-      {
-        id: "cba-3",
-        heading: "Section 2.1 Audit and Record Retention",
-        level: 2,
-        page: 5,
-        text: "All statutory records, filing confirmations, and communication transcripts shall be retained for a period of not less than seven (7) policy years.",
-        char_count: 154,
-      },
-    ],
-  },
-  {
-    id: "doc-4",
-    fileName: "SERFF-Statutory-Dispositions.pdf",
-    uploadDate: "Sep 08, 2026",
-    sectionsCount: 5,
-    totalPages: 7,
-    fileSize: "64.1 KB",
-    status: "Processed",
-    sections: [
-      {
-        id: "disp-1",
-        heading: "Filing Disposition Notice",
-        level: 1,
-        page: 1,
-        text: "Disposition Status: Received and Filed. Date Processed: 08/17/2026. Effective Date: Immediate upon acknowledgment by State Commissioner of Insurance.",
-        char_count: 153,
-      },
-      {
-        id: "disp-2",
-        heading: "Reviewer Commentary",
-        level: 1,
-        page: 2,
-        text: "Department review concluded with no remaining objections. All supplementary redline schedules have been verified against Maryland Bulletin 22-04.",
-        char_count: 151,
-      },
-    ],
-  },
-  {
-    id: "doc-5",
-    fileName: "Form-10K-Part-I-Business.pdf",
-    uploadDate: "Aug 29, 2026",
-    sectionsCount: 14,
-    totalPages: 22,
-    fileSize: "210.0 KB",
-    status: "Processed",
-    sections: [
-      {
-        id: "10k-1",
-        heading: "Item 1. Business Overview",
-        level: 1,
-        page: 1,
-        text: "Corebridge Financial provides retirement solutions and insurance products across individual retirement, group retirement, and life solutions segments.",
-        char_count: 153,
-      },
-      {
-        id: "10k-2",
-        heading: "Item 1A. Risk Factors",
-        level: 1,
-        page: 7,
-        text: "Market risk, interest rate volatility, statutory capital requirements, credit quality changes, and evolving regulatory mandates represent material risks.",
-        char_count: 159,
-      },
-    ],
-  },
-]
 
 /* ─── Level badge styling ────────────────────────────────── */
 function levelBadge(level: number) {
@@ -208,16 +55,36 @@ function levelBadge(level: number) {
 }
 
 export const DocumentsPage: React.FC = () => {
+  const [documents, setDocuments] = useState<ProcessedDocument[]>(() => {
+    try {
+      const stored = localStorage.getItem("extractai_processed_documents")
+      return stored ? JSON.parse(stored) : []
+    } catch {
+      return []
+    }
+  })
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedDoc, setSelectedDoc] = useState<ProcessedDocument | null>(null)
   const [copiedSectionId, setCopiedSectionId] = useState<string | null>(null)
 
   // Filter documents based on search query
   const filteredDocs = useMemo(() => {
-    if (!searchQuery.trim()) return MOCK_DOCUMENTS
+    if (!searchQuery.trim()) return documents
     const q = searchQuery.toLowerCase()
-    return MOCK_DOCUMENTS.filter((doc) => doc.fileName.toLowerCase().includes(q))
-  }, [searchQuery])
+    return documents.filter((doc) => doc.fileName.toLowerCase().includes(q))
+  }, [searchQuery, documents])
+
+  // Delete a document from history
+  const handleDeleteDoc = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const updated = documents.filter((d) => d.id !== id)
+    setDocuments(updated)
+    try {
+      localStorage.setItem("extractai_processed_documents", JSON.stringify(updated))
+    } catch {
+      // ignore
+    }
+  }
 
   // Copy section text helper
   const handleCopySection = (id: string, heading: string, text: string) => {
@@ -669,34 +536,65 @@ export const DocumentsPage: React.FC = () => {
                     </span>
                   </td>
 
-                  {/* Action: "View" */}
+                  {/* Action: "View" and "Delete" */}
                   <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                    <button
-                      onClick={() => setSelectedDoc(doc)}
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        padding: "5px 12px",
-                        borderRadius: 6,
-                        border: "1px solid #e4e4e7",
-                        background: "#ffffff",
-                        color: "#18181b",
-                        cursor: "pointer",
-                        transition: "all 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#1a1a1a"
-                        e.currentTarget.style.color = "#ffffff"
-                        e.currentTarget.style.borderColor = "#1a1a1a"
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "#ffffff"
-                        e.currentTarget.style.color = "#18181b"
-                        e.currentTarget.style.borderColor = "#e4e4e7"
-                      }}
-                    >
-                      View
-                    </button>
+                    <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <button
+                        onClick={() => setSelectedDoc(doc)}
+                        style={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          padding: "5px 12px",
+                          borderRadius: 6,
+                          border: "1px solid #e4e4e7",
+                          background: "#ffffff",
+                          color: "#18181b",
+                          cursor: "pointer",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "#1a1a1a"
+                          e.currentTarget.style.color = "#ffffff"
+                          e.currentTarget.style.borderColor = "#1a1a1a"
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "#ffffff"
+                          e.currentTarget.style.color = "#18181b"
+                          e.currentTarget.style.borderColor = "#e4e4e7"
+                        }}
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteDoc(doc.id, e)}
+                        title="Remove from history"
+                        style={{
+                          fontSize: 12,
+                          padding: "5px 7px",
+                          borderRadius: 6,
+                          border: "1px solid #e4e4e7",
+                          background: "#ffffff",
+                          color: "#71717a",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = "#dc2626"
+                          e.currentTarget.style.borderColor = "#fca5a5"
+                          e.currentTarget.style.background = "#fef2f2"
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = "#71717a"
+                          e.currentTarget.style.borderColor = "#e4e4e7"
+                          e.currentTarget.style.background = "#ffffff"
+                        }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

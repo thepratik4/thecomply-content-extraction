@@ -195,6 +195,25 @@ export const PdfExtractor: React.FC = () => {
           sectionsFound: m.sections_found ?? json.data.length,
           language: m.language ?? "en"
         });
+
+        try {
+          const docRecord = {
+            id: `doc-${Date.now()}`,
+            fileName: m.file_name ?? file.name,
+            uploadDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            sectionsCount: json.data.length,
+            totalPages: m.total_pages ?? json.total_pages ?? 1,
+            fileSize: m.file_size ?? formatFileSize(file.size),
+            status: "Processed",
+            sections: json.data,
+          };
+          const existing = JSON.parse(localStorage.getItem("extractai_processed_documents") || "[]");
+          const filtered = existing.filter((d: any) => d.fileName !== (m.file_name ?? file.name));
+          localStorage.setItem("extractai_processed_documents", JSON.stringify([docRecord, ...filtered]));
+        } catch {
+          // ignore storage error
+        }
+
         setTimeout(() => {
           resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         }, 100);

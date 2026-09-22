@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "./components/ui/s
 import { AppSidebar } from "./components/app-sidebar";
 import { DocumentsPage } from "./components/DocumentsPage";
 import { BatchExtractionPage } from "./components/BatchExtractionPage";
+import { SettingsPage } from "./components/SettingsPage";
 import "./App.css";
 
 const App: React.FC = () => {
@@ -114,6 +115,8 @@ const App: React.FC = () => {
               <DocumentsPage />
             ) : activeTab === "batch" ? (
               <BatchExtractionPage />
+            ) : activeTab === "settings" ? (
+              <SettingsPage />
             ) : (
               <div style={{ padding: 40, maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
                 <div

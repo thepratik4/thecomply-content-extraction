@@ -88,7 +88,6 @@ export function AppSidebar({
                 >
                   <Zap size={16} />
                   <span className="sidebar-menu-button-text">Extractor Studio</span>
-                  <SidebarMenuBadge>Live</SidebarMenuBadge>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
