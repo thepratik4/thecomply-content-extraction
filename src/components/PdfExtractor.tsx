@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import {
   FileText,
   List,
@@ -14,6 +14,7 @@ import {
   Code2,
   ArrowRight,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
 import { type ExtractedSection, type ExtractedTable } from "../mockData";
 import {
@@ -241,6 +242,36 @@ export const PdfExtractor: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const uploadTimerRef = useRef<any>(null);
+
+  // Source PDF URL tracking for auditable provenance
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!file) {
+      setFileUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setFileUrl(url);
+    return () => {
+      URL.revokeObjectURL(url);
+    };
+  }, [file]);
+
+  // Determine valid source PDF URL (uploaded file blob or sample document)
+  const pdfSourceUrl = useMemo(() => {
+    if (fileUrl) return fileUrl;
+    if (meta?.fileName === "AMGN-135003565.pdf" || (!file && results)) {
+      return "/sample-document.pdf";
+    }
+    return null;
+  }, [fileUrl, meta?.fileName, file, results]);
+
+  // Open source PDF at designated page in a new browser tab without losing state
+  const handleOpenSourcePdf = (page?: number) => {
+    if (!page || !pdfSourceUrl) return;
+    window.open(`${pdfSourceUrl}#page=${page}`, "_blank", "noopener,noreferrer");
+  };
 
   // Format file size
   const formatFileSize = (bytes: number): string => {
@@ -1030,9 +1061,20 @@ export const PdfExtractor: React.FC = () => {
                                       <Table2 size={10} />
                                     </span>
                                   )}
-                                  {section.page && (
-                                    <span className="explorer-item-page">p. {section.page}</span>
-                                  )}
+                                  {section.page ? (
+                                    <span
+                                      className={`explorer-item-page ${pdfSourceUrl ? "explorer-item-page--clickable" : ""}`}
+                                      onClick={(e) => {
+                                        if (pdfSourceUrl) {
+                                          e.stopPropagation();
+                                          handleOpenSourcePdf(section.page);
+                                        }
+                                      }}
+                                      title={pdfSourceUrl ? `View source page ${section.page}` : `Page ${section.page}`}
+                                    >
+                                      p.{section.page}
+                                    </span>
+                                  ) : null}
                                 </button>
                               );
                             })
@@ -1050,16 +1092,29 @@ export const PdfExtractor: React.FC = () => {
                                 <span className="section-badge-num">
                                   SECTION {String(selectedSectionIndex + 1).padStart(2, "0")}
                                 </span>
-                                {selectedSection.page && (
-                                  <span className="section-badge-page">
-                                    Page {selectedSection.page}
-                                  </span>
-                                )}
-                                {selectedSection.char_count && (
+                                {selectedSection.page ? (
+                                  <button
+                                    type="button"
+                                    className="section-provenance-btn"
+                                    onClick={() => handleOpenSourcePdf(selectedSection.page)}
+                                    disabled={!pdfSourceUrl}
+                                    title={
+                                      pdfSourceUrl
+                                        ? `Open source PDF at page ${selectedSection.page}`
+                                        : "Original PDF not available to open"
+                                    }
+                                  >
+                                    <span className="provenance-page-label">Page {selectedSection.page}</span>
+                                    <span className="provenance-sep">·</span>
+                                    <span className="provenance-action-text">View source</span>
+                                    <ExternalLink size={11} className="provenance-icon" />
+                                  </button>
+                                ) : null}
+                                {selectedSection.char_count ? (
                                   <span className="section-badge-chars">
                                     {selectedSection.char_count} chars
                                   </span>
-                                )}
+                                ) : null}
                               </div>
 
                               <div className="section-detail-title-row">
@@ -1287,9 +1342,24 @@ export const PdfExtractor: React.FC = () => {
                                     {String(tData.sectionIndex + 1).padStart(2, "0")}
                                   </span>
                                   <h4 className="table-card-heading">{tData.sectionHeading}</h4>
-                                  {tData.page && (
-                                    <span className="table-card-page">Page {tData.page}</span>
-                                  )}
+                                  {tData.page ? (
+                                    <button
+                                      type="button"
+                                      className="section-provenance-btn section-provenance-btn--table"
+                                      onClick={() => handleOpenSourcePdf(tData.page)}
+                                      disabled={!pdfSourceUrl}
+                                      title={
+                                        pdfSourceUrl
+                                          ? `Open source PDF at page ${tData.page}`
+                                          : "Original PDF not available to open"
+                                      }
+                                    >
+                                      <span className="provenance-page-label">Page {tData.page}</span>
+                                      <span className="provenance-sep">·</span>
+                                      <span className="provenance-action-text">View source</span>
+                                      <ExternalLink size={10} className="provenance-icon" />
+                                    </button>
+                                  ) : null}
                                   <span className="table-card-count">
                                     {tData.realTables.length > 0
                                       ? `${tData.realTables.length} table${tData.realTables.length === 1 ? "" : "s"}`
