@@ -6,6 +6,7 @@ import { AppSidebar } from "./components/app-sidebar";
 import { DocumentsPage } from "./components/DocumentsPage";
 import { BatchExtractionPage } from "./components/BatchExtractionPage";
 import { SettingsPage } from "./components/SettingsPage";
+import { ModeToggle } from "./components/mode-toggle";
 import "./App.css";
 
 const App: React.FC = () => {
@@ -41,8 +42,8 @@ const App: React.FC = () => {
           <header
             style={{
               height: 56,
-              borderBottom: "1px solid #e5e5e8",
-              background: "#ffffff",
+              borderBottom: "1px solid var(--border-color, #e5e5e8)",
+              background: "var(--header-bg, #ffffff)",
               padding: "0 20px",
               display: "flex",
               alignItems: "center",
@@ -55,9 +56,9 @@ const App: React.FC = () => {
           >
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <SidebarTrigger />
-              <div style={{ height: 16, width: 1, background: "#e5e5e8" }} />
+              <div style={{ height: 16, width: 1, background: "var(--border-color, #e5e5e8)" }} />
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary, #1a1a1a)" }}>
                   {activeTab === "studio" && "Extractor Studio"}
                   {activeTab === "documents" && "Documents"}
                   {activeTab === "batch" && "Batch Extractions"}
@@ -68,11 +69,11 @@ const App: React.FC = () => {
                   style={{
                     fontSize: 10,
                     fontWeight: 700,
-                    background: "#f4f4f5",
-                    color: "#71717a",
+                    background: "var(--card-subtle-bg, #f4f4f5)",
+                    color: "var(--text-muted, #71717a)",
                     padding: "2px 6px",
                     borderRadius: 4,
-                    border: "1px solid #e4e4e7",
+                    border: "1px solid var(--border-color, #e4e4e7)",
                     letterSpacing: "0.04em",
                   }}
                 >
@@ -82,6 +83,7 @@ const App: React.FC = () => {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <ModeToggle />
               <button
                 onClick={() => {
                   setShowDashboard(false);
@@ -93,9 +95,9 @@ const App: React.FC = () => {
                   gap: 6,
                   fontSize: 12,
                   fontWeight: 500,
-                  color: "#52525b",
-                  background: "#ffffff",
-                  border: "1px solid #e4e4e7",
+                  color: "var(--text-secondary, #52525b)",
+                  background: "var(--card-bg, #ffffff)",
+                  border: "1px solid var(--border-color, #e4e4e7)",
                   padding: "6px 12px",
                   borderRadius: 6,
                   cursor: "pointer",
@@ -108,7 +110,7 @@ const App: React.FC = () => {
           </header>
 
           {/* Dashboard Workspace */}
-          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "#fafafa" }}>
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", background: "var(--app-bg, #fafafa)" }}>
             {activeTab === "studio" ? (
               <PdfExtractor />
             ) : activeTab === "documents" ? (
@@ -196,7 +198,8 @@ const App: React.FC = () => {
             <li><a href="#how-it-works">How it works</a></li>
             <li><a href="#api">API</a></li>
           </ul>
-          <div className="nav-cta">
+          <div className="nav-cta" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <ModeToggle />
             <button
               onClick={() => setShowDashboard(true)}
               className="btn btn-ghost"

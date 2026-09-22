@@ -28,6 +28,34 @@
   --nav-h:      64px;
 }
 
+.dark,
+:root[class~="dark"] {
+  --ink:        #f4f4f5;
+  --ink-soft:   #d4d4d8;
+  --ink-muted:  #a1a1aa;
+  --ink-faint:  #71717a;
+  --surface:    #121215;
+  --surface-2:  #18181c;
+  --border:     #27272a;
+  --red:        #ef4444;
+  --red-light:  rgba(239, 68, 68, 0.15);
+}
+
+.dark .nav {
+  background: rgba(18, 18, 21, 0.9);
+  border-bottom: 1px solid #27272a;
+}
+
+.dark .btn-ghost {
+  border-color: #27272a;
+  color: #f4f4f5;
+  background: #18181c;
+}
+
+.dark .btn-ghost:hover {
+  background: #27272a;
+}
+
 /* ── Reset ──────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }

@@ -6,8 +6,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react"
-
-type ThemeMode = "system" | "light" | "dark"
+import { useTheme, type Theme } from "./theme-provider"
 
 interface ApiHealthState {
   status: "checking" | "online" | "offline"
@@ -17,26 +16,8 @@ interface ApiHealthState {
 }
 
 export const SettingsPage: React.FC = () => {
-  // 1. Theme State
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    return (localStorage.getItem("extractai_theme") as ThemeMode) || "system"
-  })
-
-  const handleThemeChange = (newTheme: ThemeMode) => {
-    setTheme(newTheme)
-    localStorage.setItem("extractai_theme", newTheme)
-    if (newTheme === "dark") {
-      document.documentElement.classList.add("dark")
-    } else if (newTheme === "light") {
-      document.documentElement.classList.remove("dark")
-    } else {
-      if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
-        document.documentElement.classList.add("dark")
-      } else {
-        document.documentElement.classList.remove("dark")
-      }
-    }
-  }
+  // 1. Theme Hook from ThemeProvider
+  const { theme, setTheme } = useTheme()
 
   // 2. API Server Status State
   const [apiHealth, setApiHealth] = useState<ApiHealthState>({
@@ -86,7 +67,7 @@ export const SettingsPage: React.FC = () => {
     <div style={{ padding: "24px 28px", maxWidth: 640, margin: "0 auto" }}>
       {/* Page Header */}
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a", margin: "0 0 4px 0" }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary, #1a1a1a)", margin: "0 0 4px 0" }}>
           Settings
         </h2>
       </div>
@@ -95,15 +76,15 @@ export const SettingsPage: React.FC = () => {
         {/* ─── 1. Theme Configuration ─────────────────────────── */}
         <div
           style={{
-            background: "#ffffff",
-            border: "1px solid #e5e5e8",
+            background: "var(--card-bg, #ffffff)",
+            border: "1px solid var(--border-color, #e5e5e8)",
             borderRadius: 8,
             padding: "16px 20px",
             boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
           }}
         >
           <div style={{ marginBottom: 12 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #1a1a1a)", margin: 0 }}>
               Theme
             </h3>
           </div>
@@ -111,7 +92,7 @@ export const SettingsPage: React.FC = () => {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
             {/* System */}
             <button
-              onClick={() => handleThemeChange("system")}
+              onClick={() => setTheme("system")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -119,21 +100,21 @@ export const SettingsPage: React.FC = () => {
                 gap: 8,
                 padding: "10px 12px",
                 borderRadius: 6,
-                border: theme === "system" ? "2px solid #1a1a1a" : "1px solid #e4e4e7",
-                background: theme === "system" ? "#fbfbfb" : "#ffffff",
+                border: theme === "system" ? "2px solid var(--text-primary, #1a1a1a)" : "1px solid var(--border-color, #e4e4e7)",
+                background: theme === "system" ? "var(--card-subtle-bg, #fbfbfb)" : "var(--card-bg, #ffffff)",
                 cursor: "pointer",
                 transition: "all 0.15s ease",
               }}
             >
-              <Laptop size={15} color={theme === "system" ? "#1a1a1a" : "#71717a"} />
-              <span style={{ fontSize: 12, fontWeight: theme === "system" ? 600 : 500, color: "#1a1a1a" }}>
+              <Laptop size={15} color={theme === "system" ? "var(--text-primary, #1a1a1a)" : "var(--text-muted, #71717a)"} />
+              <span style={{ fontSize: 12, fontWeight: theme === "system" ? 600 : 500, color: "var(--text-primary, #1a1a1a)" }}>
                 System
               </span>
             </button>
 
             {/* Light */}
             <button
-              onClick={() => handleThemeChange("light")}
+              onClick={() => setTheme("light")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -141,21 +122,21 @@ export const SettingsPage: React.FC = () => {
                 gap: 8,
                 padding: "10px 12px",
                 borderRadius: 6,
-                border: theme === "light" ? "2px solid #1a1a1a" : "1px solid #e4e4e7",
-                background: theme === "light" ? "#fbfbfb" : "#ffffff",
+                border: theme === "light" ? "2px solid var(--text-primary, #1a1a1a)" : "1px solid var(--border-color, #e4e4e7)",
+                background: theme === "light" ? "var(--card-subtle-bg, #fbfbfb)" : "var(--card-bg, #ffffff)",
                 cursor: "pointer",
                 transition: "all 0.15s ease",
               }}
             >
-              <Sun size={15} color={theme === "light" ? "#e74c3c" : "#71717a"} />
-              <span style={{ fontSize: 12, fontWeight: theme === "light" ? 600 : 500, color: "#1a1a1a" }}>
+              <Sun size={15} color={theme === "light" ? "var(--accent-red, #e74c3c)" : "var(--text-muted, #71717a)"} />
+              <span style={{ fontSize: 12, fontWeight: theme === "light" ? 600 : 500, color: "var(--text-primary, #1a1a1a)" }}>
                 Light
               </span>
             </button>
 
             {/* Dark */}
             <button
-              onClick={() => handleThemeChange("dark")}
+              onClick={() => setTheme("dark")}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -163,14 +144,14 @@ export const SettingsPage: React.FC = () => {
                 gap: 8,
                 padding: "10px 12px",
                 borderRadius: 6,
-                border: theme === "dark" ? "2px solid #1a1a1a" : "1px solid #e4e4e7",
-                background: theme === "dark" ? "#fbfbfb" : "#ffffff",
+                border: theme === "dark" ? "2px solid var(--text-primary, #1a1a1a)" : "1px solid var(--border-color, #e4e4e7)",
+                background: theme === "dark" ? "var(--card-subtle-bg, #fbfbfb)" : "var(--card-bg, #ffffff)",
                 cursor: "pointer",
                 transition: "all 0.15s ease",
               }}
             >
-              <Moon size={15} color={theme === "dark" ? "#1a1a1a" : "#71717a"} />
-              <span style={{ fontSize: 12, fontWeight: theme === "dark" ? 600 : 500, color: "#1a1a1a" }}>
+              <Moon size={15} color={theme === "dark" ? "var(--accent-red, #ef4444)" : "var(--text-muted, #71717a)"} />
+              <span style={{ fontSize: 12, fontWeight: theme === "dark" ? 600 : 500, color: "var(--text-primary, #1a1a1a)" }}>
                 Dark
               </span>
             </button>
@@ -180,8 +161,8 @@ export const SettingsPage: React.FC = () => {
         {/* ─── 2. API Server Status ───────────────────────────── */}
         <div
           style={{
-            background: "#ffffff",
-            border: "1px solid #e5e5e8",
+            background: "var(--card-bg, #ffffff)",
+            border: "1px solid var(--border-color, #e5e5e8)",
             borderRadius: 8,
             padding: "16px 20px",
             boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
@@ -195,7 +176,7 @@ export const SettingsPage: React.FC = () => {
               marginBottom: 12,
             }}
           >
-            <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #1a1a1a)", margin: 0 }}>
               API Server Status
             </h3>
 
@@ -208,9 +189,9 @@ export const SettingsPage: React.FC = () => {
                 gap: 5,
                 fontSize: 11,
                 fontWeight: 500,
-                color: "#71717a",
-                background: "#ffffff",
-                border: "1px solid #e4e4e7",
+                color: "var(--text-muted, #71717a)",
+                background: "var(--card-bg, #ffffff)",
+                border: "1px solid var(--border-color, #e4e4e7)",
                 padding: "4px 8px",
                 borderRadius: 6,
                 cursor: apiHealth.status === "checking" ? "not-allowed" : "pointer",
@@ -228,8 +209,8 @@ export const SettingsPage: React.FC = () => {
 
           <div
             style={{
-              background: "#fafafa",
-              border: "1px solid #e5e5e8",
+              background: "var(--card-subtle-bg, #fafafa)",
+              border: "1px solid var(--border-color, #e5e5e8)",
               borderRadius: 6,
               padding: "10px 14px",
               display: "flex",
@@ -239,17 +220,17 @@ export const SettingsPage: React.FC = () => {
             }}
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ color: "#71717a" }}>Status</span>
+              <span style={{ color: "var(--text-muted, #71717a)" }}>Status</span>
               {apiHealth.status === "checking" && (
-                <span style={{ color: "#a1a1aa", fontSize: 11 }}>Checking...</span>
+                <span style={{ color: "var(--text-faint, #a1a1aa)", fontSize: 11 }}>Checking...</span>
               )}
 
               {apiHealth.status === "online" && (
                 <span
                   style={{
                     color: "#15803d",
-                    background: "#f0fdf4",
-                    border: "1px solid #bbf7d0",
+                    background: "rgba(34, 197, 94, 0.12)",
+                    border: "1px solid rgba(34, 197, 94, 0.25)",
                     padding: "2px 8px",
                     borderRadius: 9999,
                     fontSize: 11,
@@ -274,9 +255,9 @@ export const SettingsPage: React.FC = () => {
               {apiHealth.status === "offline" && (
                 <span
                   style={{
-                    color: "#b91c1c",
-                    background: "#fef2f2",
-                    border: "1px solid #fecaca",
+                    color: "#ef4444",
+                    background: "rgba(239, 68, 68, 0.12)",
+                    border: "1px solid rgba(239, 68, 68, 0.25)",
                     padding: "2px 8px",
                     borderRadius: 9999,
                     fontSize: 11,
@@ -294,15 +275,15 @@ export const SettingsPage: React.FC = () => {
 
             {apiHealth.latencyMs !== undefined && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ color: "#71717a" }}>Latency</span>
-                <span style={{ fontFamily: "monospace", color: "#1a1a1a", fontSize: 11 }}>
+                <span style={{ color: "var(--text-muted, #71717a)" }}>Latency</span>
+                <span style={{ fontFamily: "monospace", color: "var(--text-primary, #1a1a1a)", fontSize: 11 }}>
                   {apiHealth.latencyMs} ms
                 </span>
               </div>
             )}
 
             {apiHealth.error && (
-              <div style={{ color: "#b91c1c", fontSize: 11 }}>
+              <div style={{ color: "#ef4444", fontSize: 11 }}>
                 {apiHealth.error}
               </div>
             )}
@@ -312,23 +293,23 @@ export const SettingsPage: React.FC = () => {
         {/* ─── 3. Application Version ─────────────────────────── */}
         <div
           style={{
-            background: "#ffffff",
-            border: "1px solid #e5e5e8",
+            background: "var(--card-bg, #ffffff)",
+            border: "1px solid var(--border-color, #e5e5e8)",
             borderRadius: 8,
             padding: "16px 20px",
             boxShadow: "0 1px 2px rgba(0,0,0,0.02)",
           }}
         >
           <div style={{ marginBottom: 12 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary, #1a1a1a)", margin: 0 }}>
               Application Version
             </h3>
           </div>
 
           <div
             style={{
-              background: "#fafafa",
-              border: "1px solid #e5e5e8",
+              background: "var(--card-subtle-bg, #fafafa)",
+              border: "1px solid var(--border-color, #e5e5e8)",
               borderRadius: 6,
               padding: "10px 14px",
               display: "flex",
@@ -337,16 +318,17 @@ export const SettingsPage: React.FC = () => {
               fontSize: 12,
             }}
           >
-            <span style={{ color: "#71717a" }}>Version</span>
+            <span style={{ color: "var(--text-muted, #71717a)" }}>Version</span>
             <span
               style={{
                 fontFamily: "monospace",
-                background: "#f4f4f5",
+                background: "var(--card-bg, #f4f4f5)",
+                border: "1px solid var(--border-color, #e4e4e7)",
                 padding: "2px 6px",
                 borderRadius: 4,
                 fontSize: 11,
                 fontWeight: 600,
-                color: "#18181b",
+                color: "var(--text-primary, #18181b)",
               }}
             >
               {apiHealth.version ? `v${apiHealth.version}` : "v2.0.0"}

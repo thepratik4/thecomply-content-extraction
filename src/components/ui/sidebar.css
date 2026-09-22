@@ -16,6 +16,36 @@
   --sidebar-ring: #e74c3c;
 }
 
+.dark {
+  --sidebar-background: #101014;
+  --sidebar-foreground: #f4f4f5;
+  --sidebar-primary: #f4f4f5;
+  --sidebar-primary-foreground: #101014;
+  --sidebar-accent: #1e1e24;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #ef4444;
+}
+
+.dark .sidebar-provider {
+  background: #09090b;
+}
+
+.dark .sidebar-menu-button {
+  color: #a1a1aa;
+}
+
+.dark .sidebar-menu-button:hover {
+  background: #1e1e24;
+  color: #f4f4f5;
+}
+
+.dark .sidebar-menu-button[data-active="true"] {
+  background: #27272a;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
 /* Sidebar wrapper layout */
 .sidebar-provider {
   display: flex;
