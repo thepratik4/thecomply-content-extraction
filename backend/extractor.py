@@ -579,7 +579,7 @@ def extract_sections(
                     _emit_pending_table(tbl, curr_subheading or curr_heading)
 
             # Flush final section
-            if curr_heading is not None or curr_body_lines:
+            if curr_heading is not None or curr_body_lines or curr_tables:
                 text_content = merge_body_lines_preserving_paragraphs(curr_body_lines)
                 raw_sections.append({
                     "heading": curr_heading or "Document Content",
@@ -589,7 +589,8 @@ def extract_sections(
                     "tables": list(curr_tables),
                 })
 
-            if not has_extracted_any_text:
+            has_any_tables = any(bool(s.get("tables")) for s in raw_sections)
+            if not has_extracted_any_text and not has_any_tables:
                 raise PDFExtractionError(
                     "No selectable text found in the PDF. The document may be scanned or image-only."
                 )

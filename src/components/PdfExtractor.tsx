@@ -76,12 +76,46 @@ function parseKeyValue(line: string): KeyValueRow | null {
   return null;
 }
 
+// Helper: serialize table rows into strings matching _emit_pending_table in extractor.py
+function getSerializedTableRows(tables?: ExtractedTable[]): Set<string> {
+  const set = new Set<string>();
+  if (!tables) return set;
+  for (const tbl of tables) {
+    const cols = tbl.columns || [];
+    for (const row of tbl.rows || []) {
+      if (cols.length === 2 && row.length >= 2) {
+        const k = (row[0] || "").trim();
+        const v = (row[1] || "").trim();
+        if (k && v) {
+          set.add(`${k}: ${v}`);
+        }
+      } else {
+        const parts: string[] = [];
+        const limit = Math.min(cols.length, row.length);
+        for (let c = 0; c < limit; c++) {
+          const colName = (cols[c] || "").trim();
+          const cellVal = String(row[c] ?? "").trim();
+          if (cellVal) {
+            parts.push(`${colName}: ${cellVal}`);
+          }
+        }
+        if (parts.length > 0) {
+          set.add(parts.join(" | "));
+        }
+      }
+    }
+  }
+  return set;
+}
+
 // Helper: parse a section's text into clean hierarchical subsections
 function parseSubsections(
   sectionHeading: string,
   text: string,
   tables?: ExtractedTable[]
 ): ParsedSubsection[] {
+  const serializedRows = getSerializedTableRows(tables);
+
   if (!text || !text.trim()) {
     return [
       {
@@ -102,14 +136,20 @@ function parseSubsections(
 
   const flushCurrent = () => {
     if (currentLines.length === 0 && !currentTitle) return;
-    const raw = currentLines.join("\n").trim();
-    if (!raw && !currentTitle) return;
 
+    // Filter out lines that match serialized table rows
+    const filteredLines = currentLines.filter((l) => !serializedRows.has(l.trim()));
+    if (filteredLines.length === 0 && !currentTitle) {
+      currentLines = [];
+      return;
+    }
+
+    const raw = filteredLines.join("\n").trim();
     const paragraphs: string[] = [];
     const keyValues: KeyValueRow[] = [];
     let currentPara: string[] = [];
 
-    for (const l of currentLines) {
+    for (const l of filteredLines) {
       const kv = parseKeyValue(l);
       if (kv) {
         if (currentPara.length > 0) {
@@ -183,14 +223,17 @@ function parseSubsections(
   flushCurrent();
 
   if (subsections.length === 0) {
-    const allLines = lines.filter((l) => l.trim());
+    const allLines = lines
+      .filter((l) => l.trim())
+      .filter((l) => !serializedRows.has(l.trim()));
     const kvs = allLines.map(parseKeyValue).filter((kv): kv is KeyValueRow => kv !== null);
+    const nonKvLines = allLines.filter((l) => !parseKeyValue(l));
     subsections.push({
       id: "sub-0",
       title: sectionHeading,
-      paragraphs: [text],
+      paragraphs: nonKvLines.length > 0 ? [nonKvLines.join(" ")] : [],
       keyValues: kvs,
-      rawText: text,
+      rawText: allLines.join("\n"),
     });
   }
 
@@ -198,21 +241,25 @@ function parseSubsections(
   if (tables && tables.length > 0 && subsections.length > 0) {
     const unassignedTables = [...tables];
 
-    // Pass 1: match table by explicit heading / title if present
+    // Pass 1: match all tables by explicit heading / title if present
     for (const sub of subsections) {
       const subNorm = sub.title.toLowerCase().trim();
-      const matchedIdx = unassignedTables.findIndex((tbl) => {
+      const matchedTables: ExtractedTable[] = [];
+      for (let i = unassignedTables.length - 1; i >= 0; i--) {
+        const tbl = unassignedTables[i];
         const tblHeading = (
           (tbl as any).heading ||
           (tbl as any).subheading ||
           (tbl as any).title ||
           ""
         ).toLowerCase().trim();
-        return tblHeading && (subNorm.includes(tblHeading) || tblHeading.includes(subNorm));
-      });
-      if (matchedIdx !== -1) {
-        const [matchedTable] = unassignedTables.splice(matchedIdx, 1);
-        sub.tables = sub.tables ? [...sub.tables, matchedTable] : [matchedTable];
+        if (tblHeading && (subNorm.includes(tblHeading) || tblHeading.includes(subNorm))) {
+          matchedTables.unshift(tbl);
+          unassignedTables.splice(i, 1);
+        }
+      }
+      if (matchedTables.length > 0) {
+        sub.tables = sub.tables ? [...sub.tables, ...matchedTables] : matchedTables;
       }
     }
 
