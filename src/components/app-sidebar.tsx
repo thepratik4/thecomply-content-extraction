@@ -3,7 +3,6 @@ import {
   Zap,
   Clock,
   Settings,
-  Terminal,
   X,
 } from "lucide-react"
 import {
@@ -177,24 +176,13 @@ export function AppSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Group 2: Developer */}
+        {/* Group 2: Developer / Settings */}
         <SidebarGroup>
           <SidebarGroupLabel>
-            <span>Developer</span>
+            <span>Preferences</span>
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeItem === "api"}
-                  onClick={() => handleSelect("api")}
-                  title="API & Webhooks"
-                >
-                  <Terminal size={16} />
-                  <span className="sidebar-menu-button-text">API & Webhooks</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={activeItem === "settings"}

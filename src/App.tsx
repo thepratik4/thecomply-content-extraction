@@ -62,7 +62,6 @@ const App: React.FC = () => {
                   {activeTab === "studio" && "Extractor Studio"}
                   {activeTab === "documents" && "Documents"}
                   {activeTab === "batch" && "Batch Extractions"}
-                  {activeTab === "api" && "API & Webhooks"}
                   {activeTab === "settings" && "Settings"}
                 </span>
                 <span
@@ -196,7 +195,6 @@ const App: React.FC = () => {
             </li>
             <li><a href="#product">Capabilities</a></li>
             <li><a href="#how-it-works">How it works</a></li>
-            <li><a href="#api">API</a></li>
           </ul>
           <div className="nav-cta" style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <ModeToggle />
