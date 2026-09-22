@@ -48,6 +48,7 @@ interface ParsedSubsection {
   paragraphs: string[];
   keyValues: KeyValueRow[];
   rawText: string;
+  tables?: ExtractedTable[];
 }
 
 interface SectionTableData {
@@ -75,16 +76,55 @@ function parseKeyValue(line: string): KeyValueRow | null {
   return null;
 }
 
+// Helper: serialize table rows into strings matching _emit_pending_table in extractor.py
+function getSerializedTableRows(tables?: ExtractedTable[]): Set<string> {
+  const set = new Set<string>();
+  if (!tables) return set;
+  for (const tbl of tables) {
+    const cols = tbl.columns || [];
+    for (const row of tbl.rows || []) {
+      if (cols.length === 2 && row.length >= 2) {
+        const k = (row[0] || "").trim();
+        const v = (row[1] || "").trim();
+        if (k && v) {
+          set.add(`${k}: ${v}`);
+        }
+      } else {
+        const parts: string[] = [];
+        const limit = Math.min(cols.length, row.length);
+        for (let c = 0; c < limit; c++) {
+          const colName = (cols[c] || "").trim();
+          const cellVal = String(row[c] ?? "").trim();
+          if (cellVal) {
+            parts.push(`${colName}: ${cellVal}`);
+          }
+        }
+        if (parts.length > 0) {
+          set.add(parts.join(" | "));
+        }
+      }
+    }
+  }
+  return set;
+}
+
 // Helper: parse a section's text into clean hierarchical subsections
-function parseSubsections(sectionHeading: string, text: string): ParsedSubsection[] {
+function parseSubsections(
+  sectionHeading: string,
+  text: string,
+  tables?: ExtractedTable[]
+): ParsedSubsection[] {
+  const serializedRows = getSerializedTableRows(tables);
+
   if (!text || !text.trim()) {
     return [
       {
         id: "sub-0",
         title: sectionHeading,
-        paragraphs: ["[No body text under this heading]"],
+        paragraphs: tables && tables.length > 0 ? [] : ["[No body text under this heading]"],
         keyValues: [],
         rawText: "",
+        tables: tables ? [...tables] : [],
       },
     ];
   }
@@ -96,14 +136,20 @@ function parseSubsections(sectionHeading: string, text: string): ParsedSubsectio
 
   const flushCurrent = () => {
     if (currentLines.length === 0 && !currentTitle) return;
-    const raw = currentLines.join("\n").trim();
-    if (!raw && !currentTitle) return;
 
+    // Filter out lines that match serialized table rows
+    const filteredLines = currentLines.filter((l) => !serializedRows.has(l.trim()));
+    if (filteredLines.length === 0 && !currentTitle) {
+      currentLines = [];
+      return;
+    }
+
+    const raw = filteredLines.join("\n").trim();
     const paragraphs: string[] = [];
     const keyValues: KeyValueRow[] = [];
     let currentPara: string[] = [];
 
-    for (const l of currentLines) {
+    for (const l of filteredLines) {
       const kv = parseKeyValue(l);
       if (kv) {
         if (currentPara.length > 0) {
@@ -177,15 +223,61 @@ function parseSubsections(sectionHeading: string, text: string): ParsedSubsectio
   flushCurrent();
 
   if (subsections.length === 0) {
-    const allLines = lines.filter((l) => l.trim());
+    const allLines = lines
+      .filter((l) => l.trim())
+      .filter((l) => !serializedRows.has(l.trim()));
     const kvs = allLines.map(parseKeyValue).filter((kv): kv is KeyValueRow => kv !== null);
+    const nonKvLines = allLines.filter((l) => !parseKeyValue(l));
     subsections.push({
       id: "sub-0",
       title: sectionHeading,
-      paragraphs: [text],
+      paragraphs: nonKvLines.length > 0 ? [nonKvLines.join(" ")] : [],
       keyValues: kvs,
-      rawText: text,
+      rawText: allLines.join("\n"),
     });
+  }
+
+  // Associate section tables with subsections
+  if (tables && tables.length > 0 && subsections.length > 0) {
+    const unassignedTables = [...tables];
+
+    // Pass 1: match all tables by explicit heading / title if present
+    for (const sub of subsections) {
+      const subNorm = sub.title.toLowerCase().trim();
+      const matchedTables: ExtractedTable[] = [];
+      for (let i = unassignedTables.length - 1; i >= 0; i--) {
+        const tbl = unassignedTables[i];
+        const tblHeading = (
+          (tbl as any).heading ||
+          (tbl as any).subheading ||
+          (tbl as any).title ||
+          ""
+        ).toLowerCase().trim();
+        if (tblHeading && (subNorm.includes(tblHeading) || tblHeading.includes(subNorm))) {
+          matchedTables.unshift(tbl);
+          unassignedTables.splice(i, 1);
+        }
+      }
+      if (matchedTables.length > 0) {
+        sub.tables = sub.tables ? [...sub.tables, ...matchedTables] : matchedTables;
+      }
+    }
+
+    // Pass 2: match remaining tables to empty subsections (no paragraphs and no kvs) in order
+    const emptySubs = subsections.filter(
+      (s) => s.paragraphs.length === 0 && s.keyValues.length === 0 && (!s.tables || s.tables.length === 0)
+    );
+    while (unassignedTables.length > 0 && emptySubs.length > 0) {
+      const sub = emptySubs.shift()!;
+      const tbl = unassignedTables.shift()!;
+      sub.tables = sub.tables ? [...sub.tables, tbl] : [tbl];
+    }
+
+    // Pass 3: any remaining unassigned tables attach to the first subsection
+    if (unassignedTables.length > 0) {
+      const targetSub = subsections[0];
+      targetSub.tables = targetSub.tables ? [...targetSub.tables, ...unassignedTables] : [...unassignedTables];
+    }
   }
 
   return subsections;
@@ -206,6 +298,60 @@ function highlightMatch(text: string, query: string): React.ReactNode {
       part
     )
   );
+}
+
+// Helper: get appropriate column class based on table width and column type
+function getTableCellClass(colName: string, totalCols: number, cIdx: number): string {
+  if (totalCols === 2) {
+    return cIdx === 0 ? "td-field-name" : "td-field-val";
+  }
+  const name = (colName || "").toLowerCase();
+  // Compact columns: dates, status, ids, codes, schedules
+  if (
+    name.includes("date") ||
+    name.includes("status") ||
+    name === "schedule" ||
+    name.includes("code") ||
+    name.includes("id") ||
+    name.includes("type") ||
+    name.includes("page")
+  ) {
+    return "td-cell-compact";
+  }
+  // Descriptive / Text-heavy columns: name, description, title, document, attached
+  if (
+    name.includes("name") ||
+    name.includes("item") ||
+    name.includes("desc") ||
+    name.includes("document") ||
+    name.includes("title") ||
+    name.includes("summary") ||
+    name.includes("text") ||
+    name.includes("comment")
+  ) {
+    return "td-cell-text";
+  }
+  return "td-cell-regular";
+}
+
+// Helper: sanitize cell text from hard newlines & PDF wrapped syllable artifacts
+function formatCellContent(cell: string): string {
+  if (!cell) return "";
+  let cleaned = cell.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim();
+  cleaned = cleaned.replace(/(\b[A-Za-z]{3,})-\s+([a-z]{2,}\b)/g, "$1$2");
+  cleaned = cleaned
+    .replace(/Disapprov\s+ed/gi, "Disapproved")
+    .replace(/DEPENDE\s+NT/gi, "DEPENDENT")
+    .replace(/INSURAN\s+CE/gi, "INSURANCE")
+    .replace(/ACCELER\s+ATED/gi, "ACCELERATED")
+    .replace(/ACCIDEN\s+TAL/gi, "ACCIDENTAL")
+    .replace(/DISMEMB\s+ERMENT/gi, "DISMEMBERMENT")
+    .replace(/CONTRIB\s+UTIONS/gi, "CONTRIBUTIONS")
+    .replace(/EXPECTE\s+D/gi, "EXPECTED")
+    .replace(/GUARAN\s+TEED/gi, "GUARANTEED")
+    .replace(/Superced\s+ed/gi, "Superceded")
+    .replace(/(\d{2}\/\d{2}\/\d{2})\s+(\d{2})/g, "$1$2");
+  return cleaned;
 }
 
 export const PdfExtractor: React.FC = () => {
@@ -535,8 +681,25 @@ export const PdfExtractor: React.FC = () => {
   };
 
   // Copy individual subsection
-  const handleCopySubsection = (subKey: string, title: string, content: string) => {
-    const formatted = `### ${title}\n\n${content}`;
+  const handleCopySubsection = (
+    subKey: string,
+    title: string,
+    content: string,
+    tables?: ExtractedTable[]
+  ) => {
+    let tableText = "";
+    if (tables && tables.length > 0) {
+      tableText = tables
+        .map((t) =>
+          [
+            t.columns.map((c) => formatCellContent(c)).join("\t"),
+            ...t.rows.map((r) => r.map((c) => formatCellContent(c)).join("\t")),
+          ].join("\n")
+        )
+        .join("\n\n");
+    }
+    const body = [content, tableText].filter(Boolean).join("\n\n");
+    const formatted = `### ${title}\n\n${body}`;
     navigator.clipboard.writeText(formatted);
     setCopiedSubKey(subKey);
     setTimeout(() => setCopiedSubKey(null), 1800);
@@ -565,8 +728,20 @@ export const PdfExtractor: React.FC = () => {
 
   // Copy specific table data as TSV/text
   const handleCopyTable = (tableData: SectionTableData) => {
-    const rows = tableData.keyValues.map((kv) => `${kv.key}\t${kv.value}`);
-    const text = `Field\tValue\n${rows.join("\n")}`;
+    let text = "";
+    if (tableData.realTables && tableData.realTables.length > 0) {
+      const chunks = tableData.realTables.map((tbl) => {
+        const header = tbl.columns.map((c) => formatCellContent(c)).join("\t");
+        const body = tbl.rows
+          .map((row) => row.map((c) => formatCellContent(c)).join("\t"))
+          .join("\n");
+        return `${header}\n${body}`;
+      });
+      text = chunks.join("\n\n");
+    } else {
+      const rows = tableData.keyValues.map((kv) => `${kv.key}\t${kv.value}`);
+      text = `Field\tValue\n${rows.join("\n")}`;
+    }
     navigator.clipboard.writeText(text);
     setCopiedTableId(tableData.sectionId);
     setTimeout(() => setCopiedTableId(null), 1800);
@@ -618,7 +793,11 @@ export const PdfExtractor: React.FC = () => {
   // Parse currently selected section into structured subsections
   const currentSubsections = useMemo(() => {
     if (!selectedSection) return [];
-    return parseSubsections(selectedSection.heading, selectedSection.text);
+    return parseSubsections(
+      selectedSection.heading,
+      selectedSection.text,
+      selectedSection.tables
+    );
   }, [selectedSection]);
 
   // Extract tabular data from all sections for the Tables View
@@ -1186,7 +1365,7 @@ export const PdfExtractor: React.FC = () => {
                                         className="btn-copy-subsection"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleCopySubsection(subKey, sub.title, sub.rawText);
+                                          handleCopySubsection(subKey, sub.title, sub.rawText, sub.tables);
                                         }}
                                         title="Copy subsection"
                                       >
@@ -1201,6 +1380,61 @@ export const PdfExtractor: React.FC = () => {
                                     {/* Subsection Body */}
                                     {isOpen && (
                                       <div className="subsection-content">
+                                        {/* Structured Tables if present in this subsection */}
+                                        {sub.tables && sub.tables.length > 0 && (
+                                          sub.tables.map((tbl, tIdx) => (
+                                            <div
+                                              key={tIdx}
+                                              className="table-scroll-wrap"
+                                              style={{
+                                                margin: "10px 0 16px 0",
+                                                border: "1px solid var(--border-color, #e5e5e8)",
+                                                borderRadius: "6px",
+                                                overflowX: "auto",
+                                              }}
+                                            >
+                                              <table
+                                                className={`results-structured-table ${
+                                                  tbl.columns.length > 2 ? "results-structured-table--multi" : ""
+                                                }`}
+                                              >
+                                                <thead>
+                                                  <tr>
+                                                    {tbl.columns.map((col, cIdx) => (
+                                                      <th
+                                                        key={cIdx}
+                                                        className={getTableCellClass(col, tbl.columns.length, cIdx)}
+                                                      >
+                                                        {col || `Col ${cIdx + 1}`}
+                                                      </th>
+                                                    ))}
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {tbl.rows.map((row, rIdx) => (
+                                                    <tr key={rIdx}>
+                                                      {row.map((cell, cIdx) => {
+                                                        const colName = tbl.columns[cIdx] || "";
+                                                        const cellClass = getTableCellClass(
+                                                          colName,
+                                                          tbl.columns.length,
+                                                          cIdx
+                                                        );
+                                                        const formatted = formatCellContent(cell);
+                                                        return (
+                                                          <td key={cIdx} className={cellClass}>
+                                                            {highlightMatch(formatted, searchQuery)}
+                                                          </td>
+                                                        );
+                                                      })}
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          ))
+                                        )}
+
                                         {/* Key-Value fields if present */}
                                         {sub.keyValues.length > 0 && (
                                           <div className="subsection-kv-grid">
@@ -1224,9 +1458,11 @@ export const PdfExtractor: React.FC = () => {
                                           </p>
                                         ))}
 
-                                        {sub.paragraphs.length === 0 && sub.keyValues.length === 0 && (
-                                          <p className="subsection-empty">[No body text under this section]</p>
-                                        )}
+                                        {sub.paragraphs.length === 0 &&
+                                          sub.keyValues.length === 0 &&
+                                          (!sub.tables || sub.tables.length === 0) && (
+                                            <p className="subsection-empty">[No body text under this section]</p>
+                                          )}
                                       </div>
                                     )}
                                   </div>
@@ -1391,22 +1627,40 @@ export const PdfExtractor: React.FC = () => {
                               {tData.realTables.length > 0 ? (
                                 tData.realTables.map((tbl, tIdx) => (
                                   <div key={tIdx} className="table-scroll-wrap">
-                                    <table className="results-structured-table">
+                                    <table
+                                      className={`results-structured-table ${
+                                        tbl.columns.length > 2 ? "results-structured-table--multi" : ""
+                                      }`}
+                                    >
                                       <thead>
                                         <tr>
                                           {tbl.columns.map((col, cIdx) => (
-                                            <th key={cIdx}>{col || `Col ${cIdx + 1}`}</th>
+                                            <th
+                                              key={cIdx}
+                                              className={getTableCellClass(col, tbl.columns.length, cIdx)}
+                                            >
+                                              {col || `Col ${cIdx + 1}`}
+                                            </th>
                                           ))}
                                         </tr>
                                       </thead>
                                       <tbody>
                                         {tbl.rows.map((row, rIdx) => (
                                           <tr key={rIdx}>
-                                            {row.map((cell, cIdx) => (
-                                              <td key={cIdx} className={cIdx === 0 ? "td-field-name" : "td-field-val"}>
-                                                {cell}
-                                              </td>
-                                            ))}
+                                            {row.map((cell, cIdx) => {
+                                              const colName = tbl.columns[cIdx] || "";
+                                              const cellClass = getTableCellClass(
+                                                colName,
+                                                tbl.columns.length,
+                                                cIdx
+                                              );
+                                              const formatted = formatCellContent(cell);
+                                              return (
+                                                <td key={cIdx} className={cellClass}>
+                                                  {formatted}
+                                                </td>
+                                              );
+                                            })}
                                           </tr>
                                         ))}
                                       </tbody>
