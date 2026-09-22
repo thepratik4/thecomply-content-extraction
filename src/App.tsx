@@ -9,7 +9,7 @@ import { SettingsPage } from "./components/SettingsPage";
 import { ModeToggle } from "./components/mode-toggle";
 import { TourProvider, useTour, type TourStep } from "./components/Tour";
 import { TourConfirmModal } from "./components/TourConfirmModal";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight, Compass } from "lucide-react";
 import "./App.css";
 
 const TOUR_STEPS: TourStep[] = [
@@ -18,11 +18,12 @@ const TOUR_STEPS: TourStep[] = [
     selectorId: "tour-dropzone",
     title: "1. Upload & File Selection",
     description:
-      "Drop any insurance or regulatory PDF filing here, or browse files from your computer. Our layout engine analyzes font sizes, styles, and character clusters to separate headings from body text.",
+      "Drop any PDF filing here, browse files from your computer, or click the sample PDF in the top-right corner to start extraction immediately.",
     position: "bottom",
     actionText: "Load Sample Document (AMGN-135003565.pdf)",
     onAction: () => {
       window.dispatchEvent(new CustomEvent("extractai:load-sample"));
+      window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
     },
   },
   {
@@ -98,7 +99,7 @@ const TourTriggerButton: React.FC<{
       }}
       title="Start interactive guided tour"
     >
-      <Sparkles size={13} />
+      <Compass size={13} />
       <span>{isActive ? "Tour Active" : "Guided Tour"}</span>
     </button>
   );
@@ -363,7 +364,7 @@ const AppContent: React.FC = () => {
               onClick={handleRequestTour}
               className="btn btn-hero-tour btn-lg"
             >
-              <Sparkles size={16} />
+              <Compass size={16} />
               <span>Guided Tour</span>
             </button>
           </div>

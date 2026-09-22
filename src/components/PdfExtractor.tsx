@@ -536,9 +536,11 @@ export const PdfExtractor: React.FC = () => {
     // Check if sample document from Guided Tour was dropped
     if (
       e.dataTransfer.types.includes("application/extractai-sample") ||
-      e.dataTransfer.getData("application/extractai-sample")
+      e.dataTransfer.getData("application/extractai-sample") ||
+      e.dataTransfer.getData("text/plain") === "AMGN-135003565.pdf"
     ) {
       handleLoadSample();
+      window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
       return;
     }
 
@@ -546,6 +548,7 @@ export const PdfExtractor: React.FC = () => {
       const droppedFile = e.dataTransfer.files[0];
       if (droppedFile.type === "application/pdf" || droppedFile.name.toLowerCase().endsWith(".pdf")) {
         startUploadAnimation(droppedFile);
+        window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
       } else {
         setError("Please upload a valid PDF document (.pdf).");
       }
@@ -557,6 +560,7 @@ export const PdfExtractor: React.FC = () => {
       const selectedFile = e.target.files[0];
       if (selectedFile.type === "application/pdf" || selectedFile.name.toLowerCase().endsWith(".pdf")) {
         startUploadAnimation(selectedFile);
+        window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
       } else {
         setError("Please select a valid PDF document (.pdf).");
       }
@@ -924,7 +928,12 @@ export const PdfExtractor: React.FC = () => {
             STATE 1: No document selected → Upload zone
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         {!file && (
-          <div id="tour-dropzone" className="upload-wrapper">
+          <div
+            id="tour-dropzone"
+            className="upload-wrapper"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
             <div
               className={`dropzone ${isDragging ? "dropzone--dragging" : ""}`}
               onDragOver={handleDragOver}
@@ -957,6 +966,7 @@ export const PdfExtractor: React.FC = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       handleLoadSample();
+                      window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
                     }}
                     style={{
                       fontSize: 11.5,

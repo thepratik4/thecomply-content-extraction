@@ -10,6 +10,7 @@ import React, {
 import { createPortal } from "react-dom";
 import {
   ArrowDown,
+  ArrowDownLeft,
   ArrowLeft,
   ArrowRight,
   Check,
@@ -153,22 +154,38 @@ export const TourProvider: React.FC<TourProviderProps> = ({
         height: updated.height,
       });
     } else {
-      // If target element is not in DOM (e.g. results not yet visible), center spotlight
-      setElementRect({
-        top: window.innerHeight / 2 - 120,
-        left: window.innerWidth / 2 - 200,
-        width: 400,
-        height: 240,
-      });
+      // If target element is not in DOM:
+      if (currentStepIndex === 0) {
+        // Step 1: if dropzone is missing (document loaded), reset workspace to restore dropzone
+        window.dispatchEvent(new CustomEvent("extractai:reset-workspace"));
+      } else {
+        // For Step 2 or others while results are still loading:
+        // Highlight the compact document bar / loading progress bar if present
+        const docBar = document.querySelector(".compact-document-bar") || document.querySelector(".extract-loading-container");
+        if (docBar) {
+          const r = docBar.getBoundingClientRect();
+          setElementRect({
+            top: r.top,
+            left: r.left,
+            width: r.width,
+            height: r.height,
+          });
+        }
+        // Retain existing elementRect without shrinking to a fake center box
+      }
     }
-  }, [currentStep]);
+  }, [currentStep, currentStepIndex]);
 
   useEffect(() => {
     if (!isActive) return;
     updateTargetRect();
 
-    // Re-check after 350ms in case DOM finished animating/expanding
-    const t = setTimeout(updateTargetRect, 350);
+    // Check periodically if target element hasn't appeared yet (e.g. during extraction)
+    const checkInterval = setInterval(() => {
+      if (currentStep && document.getElementById(currentStep.selectorId)) {
+        updateTargetRect();
+      }
+    }, 200);
 
     const onResizeOrScroll = () => {
       updateTargetRect();
@@ -177,12 +194,18 @@ export const TourProvider: React.FC<TourProviderProps> = ({
     window.addEventListener("resize", onResizeOrScroll);
     window.addEventListener("scroll", onResizeOrScroll, true);
 
+    const observer = new MutationObserver(() => {
+      updateTargetRect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+
     return () => {
-      clearTimeout(t);
+      clearInterval(checkInterval);
       window.removeEventListener("resize", onResizeOrScroll);
       window.removeEventListener("scroll", onResizeOrScroll, true);
+      observer.disconnect();
     };
-  }, [isActive, currentStepIndex, updateTargetRect]);
+  }, [isActive, currentStepIndex, currentStep, updateTargetRect]);
 
   const startTour = useCallback(
     (customSteps?: TourStep[]) => {
@@ -203,6 +226,12 @@ export const TourProvider: React.FC<TourProviderProps> = ({
 
   const nextStep = useCallback(() => {
     setCurrentStepIndex((prev) => {
+      if (prev === 0) {
+        // Advancing from Step 1: if document not loaded yet, auto-load sample
+        if (!(window as any).__extractai_has_work) {
+          window.dispatchEvent(new CustomEvent("extractai:load-sample"));
+        }
+      }
       if (prev >= steps.length - 1) {
         return -1;
       }
@@ -211,8 +240,32 @@ export const TourProvider: React.FC<TourProviderProps> = ({
   }, [steps.length]);
 
   const prevStep = useCallback(() => {
-    setCurrentStepIndex((prev) => (prev > 0 ? prev - 1 : prev));
+    setCurrentStepIndex((prev) => {
+      const nextIdx = prev > 0 ? prev - 1 : prev;
+      if (nextIdx === 0) {
+        window.dispatchEvent(new CustomEvent("extractai:reset-workspace"));
+      }
+      return nextIdx;
+    });
   }, []);
+
+  // Listen for external trigger to advance tour step (e.g. on file drop or sample load)
+  const isAdvancingRef = useRef(false);
+  useEffect(() => {
+    const handleTourNext = () => {
+      if (isActive && currentStepIndex === 0 && !isAdvancingRef.current) {
+        isAdvancingRef.current = true;
+        setTimeout(() => {
+          nextStep();
+          setTimeout(() => {
+            isAdvancingRef.current = false;
+          }, 400);
+        }, 80);
+      }
+    };
+    window.addEventListener("extractai:tour-next-step", handleTourNext);
+    return () => window.removeEventListener("extractai:tour-next-step", handleTourNext);
+  }, [isActive, currentStepIndex, nextStep]);
 
   // Keyboard navigation: ArrowRight / ArrowLeft / Escape
   useEffect(() => {
@@ -263,35 +316,61 @@ export const TourProvider: React.FC<TourProviderProps> = ({
       {isActive &&
         createPortal(
           <div className="tour-overlay-portal" role="dialog" aria-modal="true">
-            {/* SVG Mask Spotlight Cutout */}
-            <svg
-              className="tour-svg-backdrop"
-              xmlns="http://www.w3.org/2000/svg"
-              onClick={endTour}
-            >
-              <defs>
-                <mask id="tour-mask">
-                  <rect width="100%" height="100%" fill="white" />
-                  {elementRect && (
-                    <rect
-                      x={elementRect.left - padding}
-                      y={elementRect.top - padding}
-                      width={elementRect.width + padding * 2}
-                      height={elementRect.height + padding * 2}
-                      rx={borderRadius}
-                      ry={borderRadius}
-                      fill="black"
-                    />
-                  )}
-                </mask>
-              </defs>
-              <rect
-                width="100%"
-                height="100%"
-                fill="rgba(0, 0, 0, 0.65)"
-                mask="url(#tour-mask)"
+            {/* 4-Panel Backdrop: Leaves cutout 100% open so clicking inside never closes the tour and drag-and-drop works natively */}
+            {elementRect ? (
+              <>
+                {/* Top Panel */}
+                <div
+                  className="tour-backdrop-panel"
+                  style={{
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: Math.max(0, elementRect.top - padding),
+                  }}
+                  onClick={endTour}
+                />
+                {/* Bottom Panel */}
+                <div
+                  className="tour-backdrop-panel"
+                  style={{
+                    top: elementRect.top + elementRect.height + padding,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                  }}
+                  onClick={endTour}
+                />
+                {/* Left Panel */}
+                <div
+                  className="tour-backdrop-panel"
+                  style={{
+                    top: Math.max(0, elementRect.top - padding),
+                    left: 0,
+                    width: Math.max(0, elementRect.left - padding),
+                    height: elementRect.height + padding * 2,
+                  }}
+                  onClick={endTour}
+                />
+                {/* Right Panel */}
+                <div
+                  className="tour-backdrop-panel"
+                  style={{
+                    top: Math.max(0, elementRect.top - padding),
+                    left: elementRect.left + elementRect.width + padding,
+                    right: 0,
+                    height: elementRect.height + padding * 2,
+                  }}
+                  onClick={endTour}
+                />
+              </>
+            ) : (
+              <div
+                className="tour-backdrop-panel"
+                style={{ inset: 0 }}
+                onClick={endTour}
               />
-            </svg>
+            )}
 
             {/* Glowing Border around target */}
             {elementRect && (
@@ -307,89 +386,59 @@ export const TourProvider: React.FC<TourProviderProps> = ({
               />
             )}
 
-            {/* Step 1: Floating Draggable Sample PDF & Path Guide */}
+            {/* Step 1: Realistic Desktop PDF File in Top-Right Corner */}
             {currentStep?.id === "step-upload" && elementRect && (() => {
-              const samplePillWidth = 270;
-              const samplePillHeight = 48;
-              const pillTop = Math.max(16, elementRect.top - 72);
-              const pillLeft = Math.max(
-                20,
-                Math.min(
-                  window.innerWidth - samplePillWidth - 20,
-                  elementRect.left + elementRect.width / 2 - samplePillWidth / 2
-                )
+              const fileCardWidth = 140;
+              // Place comfortably in top-right corner of the dropzone
+              const fileLeft = Math.max(
+                elementRect.left + 20,
+                elementRect.left + elementRect.width - fileCardWidth - 28
               );
-              const startX = pillLeft + samplePillWidth / 2;
-              const startY = pillTop + samplePillHeight;
-              const endX = elementRect.left + elementRect.width / 2;
-              const endY = Math.min(elementRect.top + 45, elementRect.top + elementRect.height / 2);
-              const controlY = (startY + endY) / 2;
-              const badgeX = (startX + endX) / 2;
-              const badgeY = (startY + endY) / 2;
+              const fileTop = elementRect.top + 20;
 
               return (
-                <div className="tour-drag-guide-layer">
-                  {/* Curved animated arrow path */}
-                  <svg className="tour-drag-path-svg">
-                    <defs>
-                      <marker
-                        id="tour-arrowhead"
-                        markerWidth="8"
-                        markerHeight="8"
-                        refX="4"
-                        refY="4"
-                        orient="auto"
-                      >
-                        <polygon points="0 1, 7 4, 0 7" fill="#2563eb" />
-                      </marker>
-                    </defs>
-                    <path
-                      d={`M ${startX} ${startY} Q ${startX} ${controlY}, ${endX} ${endY}`}
-                      stroke="#2563eb"
-                      strokeWidth="2.5"
-                      strokeDasharray="6,5"
-                      fill="none"
-                      className="tour-animated-dash"
-                      markerEnd="url(#tour-arrowhead)"
-                    />
-                  </svg>
-
-                  {/* Floating Path Badge */}
-                  <div
-                    className="tour-drag-path-badge"
-                    style={{ left: badgeX, top: badgeY }}
-                  >
-                    <ArrowDown size={13} />
-                    <span>Drag PDF here (or click)</span>
+                <div
+                  className="tour-desktop-file"
+                  style={{ top: fileTop, left: fileLeft }}
+                  draggable={true}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("application/extractai-sample", "true");
+                    e.dataTransfer.setData("text/plain", "AMGN-135003565.pdf");
+                    e.dataTransfer.effectAllowed = "copy";
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.dispatchEvent(new CustomEvent("extractai:load-sample"));
+                    window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
+                  }}
+                  title="Click to load sample document (or drag into box)"
+                >
+                  {/* Paper sheet with dog-ear corner */}
+                  <div className="tour-file-sheet">
+                    <div className="tour-file-corner" />
+                    <div className="tour-file-lines">
+                      <div className="tour-file-line line-1" />
+                      <div className="tour-file-line line-2" />
+                      <div className="tour-file-line line-3" />
+                    </div>
+                    <div className="tour-file-banner">
+                      <span>PDF</span>
+                    </div>
+                    <div className="tour-file-lines lower">
+                      <div className="tour-file-line line-4" />
+                      <div className="tour-file-line line-5" />
+                    </div>
                   </div>
 
-                  {/* Floating Draggable Sample PDF */}
-                  <div
-                    className="tour-floating-sample-card"
-                    style={{ top: pillTop, left: pillLeft }}
-                    draggable={true}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData("application/extractai-sample", "true");
-                      e.dataTransfer.effectAllowed = "copy";
-                    }}
-                    onClick={() => {
-                      window.dispatchEvent(new CustomEvent("extractai:load-sample"));
-                    }}
-                    title="Drag this sample into the dropzone or click to load"
-                  >
-                    <div className="tour-floating-grip">
-                      <GripVertical size={14} />
-                    </div>
-                    <div className="tour-floating-icon">
-                      <FileText size={17} />
-                    </div>
-                    <div className="tour-floating-details">
-                      <span className="tour-floating-filename">AMGN-135003565.pdf</span>
-                      <span className="tour-floating-meta">Sample PDF • 142 KB</span>
-                    </div>
-                    <div className="tour-floating-action-badge">
-                      <span>Drag to drop</span>
-                    </div>
+                  {/* Filename and 1-Click hint badge underneath */}
+                  <div className="tour-file-meta-wrap">
+                    <span className="tour-file-name" title="AMGN-135003565.pdf">
+                      AMGN-135003565.pdf
+                    </span>
+                    <span className="tour-file-hint-badge">
+                      <Sparkles size={9} />
+                      <span>Click to load • 142 KB</span>
+                    </span>
                   </div>
                 </div>
               );
