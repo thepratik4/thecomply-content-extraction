@@ -8,8 +8,6 @@ import {
   AlertCircle,
   Loader2,
   Download,
-  Trash2,
-  Layers,
 } from "lucide-react"
 
 /* ─── Types ──────────────────────────────────────────────── */

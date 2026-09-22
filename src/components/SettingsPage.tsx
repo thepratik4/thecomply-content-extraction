@@ -6,7 +6,7 @@ import {
   AlertCircle,
   RefreshCw,
 } from "lucide-react"
-import { useTheme, type Theme } from "./theme-provider"
+import { useTheme } from "./theme-provider"
 
 interface ApiHealthState {
   status: "checking" | "online" | "offline"

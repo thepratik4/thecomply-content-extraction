@@ -13,6 +13,7 @@ import {
   X,
   Code2,
   ArrowRight,
+  Loader2,
 } from "lucide-react";
 import { type ExtractedSection } from "../mockData";
 import "./PdfExtractor.css";
@@ -737,12 +738,12 @@ export const PdfExtractor: React.FC = () => {
                     <span className="compact-doc-status">
                       {isUploading ? (
                         <span className="status-badge status-badge--uploading">
-                          <span className="compact-status-spinner" />
+                          <Loader2 size={12} className="spinner-lucide" />
                           Uploading... {uploadProgress}%
                         </span>
                       ) : isLoading ? (
                         <span className="status-badge status-badge--loading">
-                          <span className="compact-status-spinner" />
+                          <Loader2 size={12} className="spinner-lucide" />
                           Extracting... {extractProgress}%
                         </span>
                       ) : results ? (
@@ -783,7 +784,7 @@ export const PdfExtractor: React.FC = () => {
                   >
                     {isLoading ? (
                       <>
-                        <span className="spinner-inline" />
+                        <Loader2 size={13} className="spinner-lucide" />
                         <span>Extracting...</span>
                       </>
                     ) : (
@@ -813,7 +814,7 @@ export const PdfExtractor: React.FC = () => {
             {/* Loading Step Banner */}
             {isLoading && (
               <div className="extract-loading-box">
-                <div className="loading-spinner-ring" />
+                <Loader2 size={28} className="spinner-lucide spinner-lucide--large" />
                 <div className="loading-text-wrap">
                   <p className="loading-step-heading">{loadingStep}</p>
                   <p className="loading-step-note">Analyzing layout hierarchy, font sizes, and character clusters</p>

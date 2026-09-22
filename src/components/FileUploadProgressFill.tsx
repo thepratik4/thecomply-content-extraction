@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import { FileText, CheckCircle2, AlertCircle, Trash2, RefreshCw } from "lucide-react"
+import { FileText, CheckCircle2, Trash2, RefreshCw } from "lucide-react"
 
 export interface UploadedFile {
   id: string
@@ -17,7 +17,7 @@ export function getReadableFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-export const uploadFileWithProgress = (file: File, onProgress: (progress: number) => void) => {
+export const uploadFileWithProgress = (_file: File, onProgress: (progress: number) => void) => {
   let progress = 0
   const interval = setInterval(() => {
     progress += Math.floor(Math.random() * 8) + 4
@@ -34,38 +34,9 @@ interface FileUploadProgressFillProps {
   onFileSelect?: (file: File) => void
 }
 
-export const FileUploadProgressFill: React.FC<FileUploadProgressFillProps> = ({
-  isDisabled,
-  onFileSelect,
-}) => {
+export const FileUploadProgressFill: React.FC<FileUploadProgressFillProps> = () => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
-  const handleDropFiles = (files: FileList | File[]) => {
-    const newFiles = Array.from(files)
-    const newFilesWithIds: UploadedFile[] = newFiles.map((file) => ({
-      id: `${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      progress: 0,
-      fileObject: file,
-    }))
-
-    setUploadedFiles((prev) => [...newFilesWithIds, ...prev])
-
-    if (onFileSelect && newFiles[0]) {
-      onFileSelect(newFiles[0])
-    }
-
-    newFilesWithIds.forEach(({ id, fileObject }) => {
-      if (!fileObject) return
-      uploadFileWithProgress(fileObject, (progress) => {
-        setUploadedFiles((prev) =>
-          prev.map((f) => (f.id === id ? { ...f, progress } : f))
-        )
-      })
-    })
-  }
 
   const handleDeleteFile = (id: string) => {
     setUploadedFiles((prev) => prev.filter((file) => file.id !== id))
