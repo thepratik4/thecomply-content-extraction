@@ -332,6 +332,18 @@
   border-color: #d4d4d8;
 }
 
+.dark .sidebar-trigger {
+  background: #18181c;
+  color: #d4d4d8;
+  border-color: #27272a;
+}
+
+.dark .sidebar-trigger:hover {
+  background: #27272a;
+  color: #ffffff;
+  border-color: #3f3f46;
+}
+
 /* Main Inset / Content wrapper */
 .sidebar-inset {
   flex: 1;
@@ -340,5 +352,11 @@
   min-width: 0;
   height: 100vh;
   overflow-y: auto;
-  background: #fafafa;
+  background: var(--app-bg, #fafafa);
+  color: var(--text-primary, #18181b);
+}
+
+.dark .sidebar-inset {
+  background: var(--app-bg, #09090b);
+  color: var(--text-primary, #f4f4f5);
 }

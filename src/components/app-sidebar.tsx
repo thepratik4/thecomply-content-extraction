@@ -45,14 +45,15 @@ export function AppSidebar({
               width: 32,
               height: 32,
               borderRadius: 8,
-              background: "#1a1a1a",
+              background: "#e74c3c",
               color: "#ffffff",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontWeight: 700,
-              fontSize: 14,
+              fontSize: 15,
               flexShrink: 0,
+              boxShadow: "0 2px 8px rgba(231, 76, 60, 0.35)",
             }}
           >
             E
@@ -64,7 +65,14 @@ export function AppSidebar({
               display: state === "collapsed" ? "none" : "block",
             }}
           >
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#1a1a1a", letterSpacing: "-0.01em" }}>
+            <span
+              style={{
+                fontSize: 15,
+                fontWeight: 700,
+                color: "var(--sidebar-foreground, #18181b)",
+                letterSpacing: "-0.01em",
+              }}
+            >
               ExtractAI
             </span>
           </div>

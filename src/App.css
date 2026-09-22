@@ -46,6 +46,10 @@
   border-bottom: 1px solid #27272a;
 }
 
+.dark .nav-logo-text {
+  color: #f4f4f5;
+}
+
 .dark .btn-ghost {
   border-color: #27272a;
   color: #f4f4f5;
@@ -106,7 +110,7 @@ ul { list-style: none; }
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: var(--ink);
+  background: var(--red, #e74c3c);
   color: #fff;
   font-size: 14px;
   font-weight: 700;
@@ -114,6 +118,7 @@ ul { list-style: none; }
   align-items: center;
   justify-content: center;
   letter-spacing: 0;
+  box-shadow: 0 2px 6px rgba(231, 76, 60, 0.25);
 }
 .nav-links {
   display: flex;

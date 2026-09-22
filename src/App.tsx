@@ -302,9 +302,6 @@ const App: React.FC = () => {
         </div>
       </div>
 
-      {/* ── Interactive Extractor Workspace ────────────────────────── */}
-      <PdfExtractor />
-
       {/* ── Feature Grid ───────────────────────────────────────────── */}
       <section className="features" id="product">
         <div className="features-header">
