@@ -5,6 +5,7 @@ import {
   Clock,
   Settings,
   Terminal,
+  X,
 } from "lucide-react"
 import {
   Sidebar,
@@ -17,7 +18,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarMenuBadge,
   SidebarRail,
   useSidebar,
 } from "./ui/sidebar"
@@ -33,14 +33,43 @@ export function AppSidebar({
   onSelectItem,
   onExitDashboard,
 }: AppSidebarProps) {
-  const { state } = useSidebar()
+  const { state, isMobile, setOpenMobile, toggleSidebar } = useSidebar()
+
+  const handleSelect = (item: string) => {
+    onSelectItem?.(item)
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
+
+  const handleExit = () => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+    onExitDashboard?.()
+  }
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
       {/* ─── Header: Brand ──────────────────────────────────── */}
       <SidebarHeader>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", overflow: "hidden" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: state === "collapsed" ? "center" : "flex-start",
+            gap: state === "collapsed" ? 0 : 10,
+            width: "100%",
+            overflow: "visible",
+          }}
+        >
           <div
+            onClick={() => {
+              if (state === "collapsed") {
+                toggleSidebar()
+              }
+            }}
+            title={state === "collapsed" ? "Expand sidebar" : "ExtractAI"}
             style={{
               width: 32,
               height: 32,
@@ -54,28 +83,53 @@ export function AppSidebar({
               fontSize: 15,
               flexShrink: 0,
               boxShadow: "0 2px 8px rgba(231, 76, 60, 0.35)",
+              cursor: state === "collapsed" ? "pointer" : "default",
             }}
           >
             E
           </div>
-          <div
-            style={{
-              flex: 1,
-              minWidth: 0,
-              display: state === "collapsed" ? "none" : "block",
-            }}
-          >
-            <span
+          {state !== "collapsed" && (
+            <div
               style={{
-                fontSize: 15,
-                fontWeight: 700,
-                color: "var(--sidebar-foreground, #18181b)",
-                letterSpacing: "-0.01em",
+                flex: 1,
+                minWidth: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
             >
-              ExtractAI
-            </span>
-          </div>
+              <span
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: "var(--sidebar-foreground, #18181b)",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                ExtractAI
+              </span>
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setOpenMobile(false)}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "var(--sidebar-foreground)",
+                    padding: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    opacity: 0.7,
+                  }}
+                  title="Close sidebar"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </SidebarHeader>
 
@@ -91,7 +145,7 @@ export function AppSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={activeItem === "studio"}
-                  onClick={() => onSelectItem?.("studio")}
+                  onClick={() => handleSelect("studio")}
                   title="Extractor Studio"
                 >
                   <Zap size={16} />
@@ -102,7 +156,7 @@ export function AppSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={activeItem === "documents"}
-                  onClick={() => onSelectItem?.("documents")}
+                  onClick={() => handleSelect("documents")}
                   title="Documents"
                 >
                   <FileText size={16} />
@@ -113,7 +167,7 @@ export function AppSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={activeItem === "batch"}
-                  onClick={() => onSelectItem?.("batch")}
+                  onClick={() => handleSelect("batch")}
                   title="Batch Extractions"
                 >
                   <Clock size={16} />
@@ -134,7 +188,7 @@ export function AppSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={activeItem === "api"}
-                  onClick={() => onSelectItem?.("api")}
+                  onClick={() => handleSelect("api")}
                   title="API & Webhooks"
                 >
                   <Terminal size={16} />
@@ -145,7 +199,7 @@ export function AppSidebar({
               <SidebarMenuItem>
                 <SidebarMenuButton
                   isActive={activeItem === "settings"}
-                  onClick={() => onSelectItem?.("settings")}
+                  onClick={() => handleSelect("settings")}
                   title="Settings"
                 >
                   <Settings size={16} />
@@ -162,7 +216,7 @@ export function AppSidebar({
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
           {onExitDashboard && (
             <button
-              onClick={onExitDashboard}
+              onClick={handleExit}
               title="Back to Landing Page"
               style={{
                 width: "100%",

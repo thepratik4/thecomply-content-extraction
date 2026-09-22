@@ -58,7 +58,9 @@ export const SidebarProvider = forwardRef<HTMLDivElement, SidebarProviderProps>(
     },
     ref
   ) => {
-    const [isMobile, setIsMobile] = useState(false)
+    const [isMobile, setIsMobile] = useState(() =>
+      typeof window !== "undefined" ? window.innerWidth < 768 : false
+    )
     const [openMobile, setOpenMobile] = useState(false)
 
     // Uncontrolled vs Controlled state
@@ -94,7 +96,7 @@ export const SidebarProvider = forwardRef<HTMLDivElement, SidebarProviderProps>(
       } else {
         setOpen((prev) => !prev)
       }
-    }, [isMobile, setOpen])
+    }, [isMobile, setOpen, setOpenMobile])
 
     // Keyboard shortcut (ctrl+b or cmd+b)
     useEffect(() => {
@@ -168,7 +170,32 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(
     },
     ref
   ) => {
-    const { state, open } = useSidebar()
+    const { state, isMobile, openMobile, setOpenMobile } = useSidebar()
+
+    if (isMobile) {
+      return (
+        <>
+          {openMobile && (
+            <div
+              className="sidebar-overlay"
+              onClick={() => setOpenMobile(false)}
+            />
+          )}
+          <aside
+            ref={ref}
+            data-state={openMobile ? "expanded" : "collapsed"}
+            data-mobile="true"
+            data-collapsible={collapsible}
+            data-variant={variant}
+            data-side={side}
+            className={`sidebar ${className}`}
+            {...props}
+          >
+            {children}
+          </aside>
+        </>
+      )
+    }
 
     return (
       <aside
@@ -201,6 +228,8 @@ export const SidebarTrigger = forwardRef<HTMLButtonElement, SidebarTriggerProps>
         type="button"
         className={`sidebar-trigger ${className}`}
         onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
           onClick?.(e)
           toggleSidebar()
         }}
@@ -228,6 +257,8 @@ export const SidebarRail = forwardRef<
       type="button"
       className={`sidebar-rail ${className}`}
       onClick={(e) => {
+        e.preventDefault()
+        e.stopPropagation()
         onClick?.(e)
         toggleSidebar()
       }}
