@@ -48,6 +48,7 @@ interface ParsedSubsection {
   paragraphs: string[];
   keyValues: KeyValueRow[];
   rawText: string;
+  tables?: ExtractedTable[];
 }
 
 interface SectionTableData {
@@ -76,15 +77,20 @@ function parseKeyValue(line: string): KeyValueRow | null {
 }
 
 // Helper: parse a section's text into clean hierarchical subsections
-function parseSubsections(sectionHeading: string, text: string): ParsedSubsection[] {
+function parseSubsections(
+  sectionHeading: string,
+  text: string,
+  tables?: ExtractedTable[]
+): ParsedSubsection[] {
   if (!text || !text.trim()) {
     return [
       {
         id: "sub-0",
         title: sectionHeading,
-        paragraphs: ["[No body text under this heading]"],
+        paragraphs: tables && tables.length > 0 ? [] : ["[No body text under this heading]"],
         keyValues: [],
         rawText: "",
+        tables: tables ? [...tables] : [],
       },
     ];
   }
@@ -186,6 +192,45 @@ function parseSubsections(sectionHeading: string, text: string): ParsedSubsectio
       keyValues: kvs,
       rawText: text,
     });
+  }
+
+  // Associate section tables with subsections
+  if (tables && tables.length > 0 && subsections.length > 0) {
+    const unassignedTables = [...tables];
+
+    // Pass 1: match table by explicit heading / title if present
+    for (const sub of subsections) {
+      const subNorm = sub.title.toLowerCase().trim();
+      const matchedIdx = unassignedTables.findIndex((tbl) => {
+        const tblHeading = (
+          (tbl as any).heading ||
+          (tbl as any).subheading ||
+          (tbl as any).title ||
+          ""
+        ).toLowerCase().trim();
+        return tblHeading && (subNorm.includes(tblHeading) || tblHeading.includes(subNorm));
+      });
+      if (matchedIdx !== -1) {
+        const [matchedTable] = unassignedTables.splice(matchedIdx, 1);
+        sub.tables = sub.tables ? [...sub.tables, matchedTable] : [matchedTable];
+      }
+    }
+
+    // Pass 2: match remaining tables to empty subsections (no paragraphs and no kvs) in order
+    const emptySubs = subsections.filter(
+      (s) => s.paragraphs.length === 0 && s.keyValues.length === 0 && (!s.tables || s.tables.length === 0)
+    );
+    while (unassignedTables.length > 0 && emptySubs.length > 0) {
+      const sub = emptySubs.shift()!;
+      const tbl = unassignedTables.shift()!;
+      sub.tables = sub.tables ? [...sub.tables, tbl] : [tbl];
+    }
+
+    // Pass 3: any remaining unassigned tables attach to the first subsection
+    if (unassignedTables.length > 0) {
+      const targetSub = subsections[0];
+      targetSub.tables = targetSub.tables ? [...targetSub.tables, ...unassignedTables] : [...unassignedTables];
+    }
   }
 
   return subsections;
@@ -535,8 +580,20 @@ export const PdfExtractor: React.FC = () => {
   };
 
   // Copy individual subsection
-  const handleCopySubsection = (subKey: string, title: string, content: string) => {
-    const formatted = `### ${title}\n\n${content}`;
+  const handleCopySubsection = (
+    subKey: string,
+    title: string,
+    content: string,
+    tables?: ExtractedTable[]
+  ) => {
+    let tableText = "";
+    if (tables && tables.length > 0) {
+      tableText = tables
+        .map((t) => [t.columns.join("\t"), ...t.rows.map((r) => r.join("\t"))].join("\n"))
+        .join("\n\n");
+    }
+    const body = [content, tableText].filter(Boolean).join("\n\n");
+    const formatted = `### ${title}\n\n${body}`;
     navigator.clipboard.writeText(formatted);
     setCopiedSubKey(subKey);
     setTimeout(() => setCopiedSubKey(null), 1800);
@@ -618,7 +675,11 @@ export const PdfExtractor: React.FC = () => {
   // Parse currently selected section into structured subsections
   const currentSubsections = useMemo(() => {
     if (!selectedSection) return [];
-    return parseSubsections(selectedSection.heading, selectedSection.text);
+    return parseSubsections(
+      selectedSection.heading,
+      selectedSection.text,
+      selectedSection.tables
+    );
   }, [selectedSection]);
 
   // Extract tabular data from all sections for the Tables View
@@ -1186,7 +1247,7 @@ export const PdfExtractor: React.FC = () => {
                                         className="btn-copy-subsection"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          handleCopySubsection(subKey, sub.title, sub.rawText);
+                                          handleCopySubsection(subKey, sub.title, sub.rawText, sub.tables);
                                         }}
                                         title="Copy subsection"
                                       >
@@ -1201,6 +1262,46 @@ export const PdfExtractor: React.FC = () => {
                                     {/* Subsection Body */}
                                     {isOpen && (
                                       <div className="subsection-content">
+                                        {/* Structured Tables if present in this subsection */}
+                                        {sub.tables && sub.tables.length > 0 && (
+                                          sub.tables.map((tbl, tIdx) => (
+                                            <div
+                                              key={tIdx}
+                                              className="table-scroll-wrap"
+                                              style={{
+                                                margin: "10px 0 16px 0",
+                                                border: "1px solid var(--border-color, #e5e5e8)",
+                                                borderRadius: "6px",
+                                                overflow: "hidden",
+                                              }}
+                                            >
+                                              <table className="results-structured-table">
+                                                <thead>
+                                                  <tr>
+                                                    {tbl.columns.map((col, cIdx) => (
+                                                      <th key={cIdx}>{col || `Col ${cIdx + 1}`}</th>
+                                                    ))}
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {tbl.rows.map((row, rIdx) => (
+                                                    <tr key={rIdx}>
+                                                      {row.map((cell, cIdx) => (
+                                                        <td
+                                                          key={cIdx}
+                                                          className={cIdx === 0 ? "td-field-name" : "td-field-val"}
+                                                        >
+                                                          {highlightMatch(cell, searchQuery)}
+                                                        </td>
+                                                      ))}
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          ))
+                                        )}
+
                                         {/* Key-Value fields if present */}
                                         {sub.keyValues.length > 0 && (
                                           <div className="subsection-kv-grid">
@@ -1224,9 +1325,11 @@ export const PdfExtractor: React.FC = () => {
                                           </p>
                                         ))}
 
-                                        {sub.paragraphs.length === 0 && sub.keyValues.length === 0 && (
-                                          <p className="subsection-empty">[No body text under this section]</p>
-                                        )}
+                                        {sub.paragraphs.length === 0 &&
+                                          sub.keyValues.length === 0 &&
+                                          (!sub.tables || sub.tables.length === 0) && (
+                                            <p className="subsection-empty">[No body text under this section]</p>
+                                          )}
                                       </div>
                                     )}
                                   </div>

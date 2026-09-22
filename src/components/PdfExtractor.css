@@ -1541,6 +1541,31 @@
   word-break: break-word;
 }
 
+.dark .results-structured-table thead tr {
+  background: #18181c;
+  border-bottom: 1px solid #27272a;
+}
+
+.dark .results-structured-table th {
+  color: #a1a1aa;
+}
+
+.dark .results-structured-table tbody tr {
+  border-bottom: 1px solid #202024;
+}
+
+.dark .results-structured-table tbody tr:hover {
+  background: #1a1a1f;
+}
+
+.dark .td-field-name {
+  color: #f4f4f5;
+}
+
+.dark .td-field-val {
+  color: #d4d4d8;
+}
+
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    View 3: JSON View
    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */

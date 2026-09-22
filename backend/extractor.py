@@ -360,6 +360,8 @@ def extract_page_tables(page: Any) -> Tuple[List[Dict[str, Any]], List[Tuple[flo
                     "type": "table",
                     "columns": columns,
                     "rows": data_rows,
+                    "top": table_obj.bbox[1],
+                    "bbox": list(table_obj.bbox),
                 })
                 table_bboxes.append(table_obj.bbox)
         except Exception:
@@ -426,24 +428,49 @@ def extract_sections(
             # Pass 3: main extraction
             raw_sections: List[Dict[str, Any]] = []
             curr_heading: Optional[str] = None
+            curr_subheading: Optional[str] = None
             curr_level: int = 1
             curr_page: int = 1
             curr_body_lines: List[str] = []
             curr_tables: List[Dict[str, Any]] = []
             has_extracted_any_text = False
 
+            def _emit_pending_table(tbl: Dict[str, Any], context_heading: Optional[str]):
+                tbl_heading = context_heading or curr_heading or "Table"
+                tbl["heading"] = tbl_heading
+                curr_tables.append(tbl)
+                cols = tbl.get("columns", [])
+                for row in tbl.get("rows", []):
+                    if len(cols) == 2 and len(row) >= 2:
+                        k = row[0].strip()
+                        v = row[1].strip()
+                        if k and v:
+                            curr_body_lines.append(f"{k}: {v}")
+                    else:
+                        parts = [
+                            f"{cols[c].strip()}: {str(row[c]).strip()}"
+                            for c in range(min(len(cols), len(row)))
+                            if str(row[c]).strip()
+                        ]
+                        if parts:
+                            curr_body_lines.append(" | ".join(parts))
+
             for page_idx, page in enumerate(pdf.pages):
                 page_num = page_idx + 1
 
                 # Extract tables and their bboxes from this page
                 page_tables, table_bboxes = extract_page_tables(page)
+                pending_page_tables = list(page_tables)
+                pending_page_tables.sort(key=lambda t: t.get("top", 0.0))
 
                 words = page.extract_words(
                     extra_attrs=["fontname", "size"],
                     keep_blank_chars=False
                 )
                 if not words:
-                    curr_tables.extend(page_tables)
+                    while pending_page_tables:
+                        tbl = pending_page_tables.pop(0)
+                        _emit_pending_table(tbl, curr_subheading or curr_heading)
                     continue
 
                 # Sort and group words into horizontal lines, skipping table regions
@@ -466,9 +493,6 @@ def extract_sections(
                 if cur_line:
                     lines.append(cur_line)
 
-                # Tables on this page get associated with the current heading context
-                pending_page_tables = list(page_tables)
-
                 line_idx = 0
                 while line_idx < len(lines):
                     line_words = lines[line_idx]
@@ -482,6 +506,11 @@ def extract_sections(
                         continue
                     if is_running_header_or_footer(raw_line, top, page.height, avg_size, modal_size, repeated_lines):
                         continue
+
+                    # Emit any tables located vertically above this line
+                    while pending_page_tables and pending_page_tables[0].get("top", 0.0) < top:
+                        tbl = pending_page_tables.pop(0)
+                        _emit_pending_table(tbl, curr_subheading or curr_heading)
 
                     has_extracted_any_text = True
                     cleaned_line = repair_kerning_artifacts(raw_line)
@@ -510,21 +539,20 @@ def extract_sections(
                                 break
 
                         # Flush previous section (NO deduplication — same heading = separate entry)
-                        if curr_heading is not None or curr_body_lines:
+                        if curr_heading is not None or curr_body_lines or curr_tables:
                             text_content = merge_body_lines_preserving_paragraphs(curr_body_lines)
-                            section_tables = list(curr_tables) + pending_page_tables
-                            pending_page_tables = []
                             raw_sections.append({
                                 "heading": curr_heading or "Introduction",
                                 "level": curr_level,
                                 "page": curr_page,
                                 "text": text_content,
-                                "tables": section_tables,
+                                "tables": list(curr_tables),
                             })
                             curr_body_lines = []
                             curr_tables = []
 
                         curr_heading = cleaned_line
+                        curr_subheading = None
                         curr_level = 1
                         curr_page = page_num
 
@@ -532,11 +560,15 @@ def extract_sections(
                         # Emit H2/H3 as markdown markers for frontend subsection parser
                         prefix = "## " if level == 2 else "### "
                         curr_body_lines.append(prefix + cleaned_line)
+                        curr_subheading = cleaned_line
 
                     else:
                         curr_body_lines.append(cleaned_line)
 
-                curr_tables.extend(pending_page_tables)
+                # Emit any remaining tables on this page below all lines
+                while pending_page_tables:
+                    tbl = pending_page_tables.pop(0)
+                    _emit_pending_table(tbl, curr_subheading or curr_heading)
 
             # Flush final section
             if curr_heading is not None or curr_body_lines:
