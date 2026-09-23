@@ -56,7 +56,7 @@ class ErrorResponse(BaseModel):
 
 # --- App Initialization ---
 app = FastAPI(
-    title="ExtractAI PDF Extraction API",
+    title="TheExtractor PDF Extraction API",
     description="High-performance pipeline converting complex PDF documents into structured heading and body-text pairs.",
     version="2.0.0",
     docs_url="/docs",

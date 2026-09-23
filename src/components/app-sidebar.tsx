@@ -9,7 +9,6 @@ import {
   Sidebar,
   SidebarHeader,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
@@ -19,6 +18,7 @@ import {
   SidebarRail,
   useSidebar,
 } from "./ui/sidebar"
+import { TheExtractorLogo } from "./TheExtractorLogo"
 
 interface AppSidebarProps {
   activeItem?: string
@@ -65,26 +65,22 @@ export function AppSidebar({
             onClick={() => {
               if (state === "collapsed") {
                 toggleSidebar()
+              } else {
+                handleExit()
               }
             }}
-            title={state === "collapsed" ? "Expand sidebar" : "ExtractAI"}
+            title={state === "collapsed" ? "Expand sidebar" : "TheExtractor · Return to Home"}
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: "#e74c3c",
-              color: "#ffffff",
+              cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontWeight: 700,
-              fontSize: 15,
+              borderRadius: 8,
               flexShrink: 0,
-              boxShadow: "0 2px 8px rgba(231, 76, 60, 0.35)",
-              cursor: state === "collapsed" ? "pointer" : "default",
+              transition: "transform 0.18s ease, filter 0.18s ease",
             }}
           >
-            E
+            <TheExtractorLogo size={28} />
           </div>
           {state !== "collapsed" && (
             <div
@@ -94,7 +90,10 @@ export function AppSidebar({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
+                cursor: "pointer",
               }}
+              onClick={handleExit}
+              title="TheExtractor · Return to Home"
             >
               <span
                 style={{
@@ -104,7 +103,7 @@ export function AppSidebar({
                   letterSpacing: "-0.01em",
                 }}
               >
-                ExtractAI
+                TheExtractor
               </span>
               {isMobile && (
                 <button
@@ -198,32 +197,7 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
 
-      {/* ─── Footer: Back to Landing Page ────────────────────── */}
-      <SidebarFooter>
-        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
-          {onExitDashboard && (
-            <button
-              onClick={handleExit}
-              title="Back to Landing Page"
-              style={{
-                width: "100%",
-                padding: state === "collapsed" ? "8px 0" : "6px 8px",
-                borderRadius: 6,
-                border: "1px solid #e4e4e7",
-                background: "#fafafa",
-                color: "#71717a",
-                fontSize: 11,
-                fontWeight: 600,
-                cursor: "pointer",
-                textAlign: "center",
-                transition: "all 0.15s ease",
-              }}
-            >
-              {state === "collapsed" ? "←" : "← Back to Landing Page"}
-            </button>
-          )}
-        </div>
-      </SidebarFooter>
+
 
       {/* ─── Collapsible Rail ─────────────────────────────────── */}
       <SidebarRail />

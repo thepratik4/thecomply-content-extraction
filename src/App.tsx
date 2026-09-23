@@ -11,6 +11,7 @@ import { TourProvider, useTour, type TourStep } from "./components/Tour";
 import { TourConfirmModal } from "./components/TourConfirmModal";
 import { ArrowRight, Compass } from "lucide-react";
 import { useRouter, type DashboardTab } from "./hooks/useRouter";
+import { TheExtractorLogo } from "./components/TheExtractorLogo";
 import "./App.css";
 
 const TOUR_STEPS: TourStep[] = [
@@ -172,25 +173,6 @@ const DashboardContent: React.FC<{
               onRequestTour={onRequestTour}
             />
             <ModeToggle />
-            <button
-              onClick={onExitDashboard}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--text-secondary, #52525b)",
-                background: "var(--card-bg, #ffffff)",
-                border: "1px solid var(--border-color, #e4e4e7)",
-                padding: "6px 12px",
-                borderRadius: 6,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              ← Back to Landing Page
-            </button>
           </div>
         </header>
 
@@ -226,7 +208,7 @@ const DashboardContent: React.FC<{
                 {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Workspace
               </h3>
               <p style={{ fontSize: 13, color: "#71717a", maxWidth: 400, margin: "0 auto 20px auto" }}>
-                This dashboard module is configured as part of the ExtractAI system.
+                This dashboard module is configured as part of TheExtractor.
               </p>
               <button
                 onClick={() => onSelectTab("studio")}
@@ -314,7 +296,7 @@ const AppContent: React.FC = () => {
                   navigate("/");
                 }}
               >
-                <span className="nav-logo-square" />
+                <TheExtractorLogo size={24} className="nav-brand-icon" />
                 <span className="nav-logo-text">TheExtractor</span>
               </a>
 
@@ -330,7 +312,7 @@ const AppContent: React.FC = () => {
           {/* Eyebrow */}
           <p className="eyebrow">
             <span className="eyebrow-dot" />
-            AI-Powered Document Extraction
+            Automated PDF Document Extraction
           </p>
 
           {/* Headline */}
@@ -423,8 +405,8 @@ const AppContent: React.FC = () => {
       {/* ── Footer ─────────────────────────────────────────────────── */}
       <footer className="footer">
         <div className="footer-inner">
-          <span className="footer-logo">ExtractAI</span>
-          <p className="footer-copy">© 2024 ExtractAI. All rights reserved.</p>
+          <span className="footer-logo">TheExtractor</span>
+          <p className="footer-copy">© 2024 TheExtractor. All rights reserved.</p>
           <div className="footer-links">
             <a href="#privacy">Privacy</a>
             <a href="#terms">Terms</a>
