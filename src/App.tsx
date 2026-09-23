@@ -10,6 +10,7 @@ import { ModeToggle } from "./components/mode-toggle";
 import { TourProvider, useTour, type TourStep } from "./components/Tour";
 import { TourConfirmModal } from "./components/TourConfirmModal";
 import { ArrowRight, Compass } from "lucide-react";
+import { useRouter, type DashboardTab } from "./hooks/useRouter";
 import "./App.css";
 
 const TOUR_STEPS: TourStep[] = [
@@ -108,21 +109,18 @@ const TourTriggerButton: React.FC<{
 };
 
 const DashboardContent: React.FC<{
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  setShowDashboard: (show: boolean) => void;
+  activeTab: DashboardTab;
+  onSelectTab: (tab: DashboardTab) => void;
+  onExitDashboard: () => void;
   onRequestTour: () => void;
-}> = ({ activeTab, setActiveTab, setShowDashboard, onRequestTour }) => {
+}> = ({ activeTab, onSelectTab, onExitDashboard, onRequestTour }) => {
 
   return (
     <SidebarProvider defaultOpen={true}>
       <AppSidebar
         activeItem={activeTab}
-        onSelectItem={setActiveTab}
-        onExitDashboard={() => {
-          setShowDashboard(false);
-          window.location.hash = "";
-        }}
+        onSelectItem={(item) => onSelectTab(item as DashboardTab)}
+        onExitDashboard={onExitDashboard}
       />
       <SidebarInset>
         {/* Dashboard Header with Sidebar Trigger */}
@@ -170,15 +168,12 @@ const DashboardContent: React.FC<{
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <TourTriggerButton
-              onSwitchTab={() => setActiveTab("studio")}
+              onSwitchTab={() => onSelectTab("studio")}
               onRequestTour={onRequestTour}
             />
             <ModeToggle />
             <button
-              onClick={() => {
-                setShowDashboard(false);
-                window.location.hash = "";
-              }}
+              onClick={onExitDashboard}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -234,7 +229,7 @@ const DashboardContent: React.FC<{
                 This dashboard module is configured as part of the ExtractAI system.
               </p>
               <button
-                onClick={() => setActiveTab("studio")}
+                onClick={() => onSelectTab("studio")}
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
@@ -258,40 +253,40 @@ const DashboardContent: React.FC<{
 
 const AppContent: React.FC = () => {
   const { startTour } = useTour();
-  const [showDashboard, setShowDashboard] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<string>("studio");
+  const { navigate, isDashboard, currentTab } = useRouter();
   const [showTourConfirmModal, setShowTourConfirmModal] = useState<boolean>(false);
 
-  // Check URL hash on initial load and on hash change
-  useEffect(() => {
-    const handleHash = () => {
-      if (window.location.hash === "#extractor" || window.location.hash === "#studio") {
-        setShowDashboard(true);
+  const handleSelectTab = useCallback(
+    (tab: DashboardTab) => {
+      if (tab === "studio") {
+        navigate("/dashboard");
+      } else {
+        navigate(`/dashboard/${tab}`);
       }
-    };
-    handleHash();
-    window.addEventListener("hashchange", handleHash);
-    return () => window.removeEventListener("hashchange", handleHash);
-  }, []);
+    },
+    [navigate]
+  );
+
+  const handleExitDashboard = useCallback(() => {
+    navigate("/");
+  }, [navigate]);
 
   const handleRequestTour = useCallback(() => {
     const hasWork = Boolean((window as any).__extractai_has_work);
     if (hasWork) {
       setShowTourConfirmModal(true);
     } else {
-      setShowDashboard(true);
-      setActiveTab("studio");
+      navigate("/dashboard");
       startTour();
     }
-  }, [startTour]);
+  }, [navigate, startTour]);
 
   const handleConfirmTour = useCallback(() => {
     setShowTourConfirmModal(false);
     window.dispatchEvent(new CustomEvent("extractai:reset-workspace"));
-    setShowDashboard(true);
-    setActiveTab("studio");
+    navigate("/dashboard");
     startTour();
-  }, [startTour]);
+  }, [navigate, startTour]);
 
   const handleCancelTourModal = useCallback(() => {
     setShowTourConfirmModal(false);
@@ -299,11 +294,11 @@ const AppContent: React.FC = () => {
 
   return (
     <>
-      {showDashboard ? (
+      {isDashboard ? (
         <DashboardContent
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          setShowDashboard={setShowDashboard}
+          activeTab={currentTab}
+          onSelectTab={handleSelectTab}
+          onExitDashboard={handleExitDashboard}
           onRequestTour={handleRequestTour}
         />
       ) : (
@@ -316,8 +311,7 @@ const AppContent: React.FC = () => {
                 className="nav-logo"
                 onClick={(e) => {
                   e.preventDefault();
-                  setShowDashboard(false);
-                  window.location.hash = "";
+                  navigate("/");
                 }}
               >
                 <span className="nav-logo-square" />
@@ -356,7 +350,7 @@ const AppContent: React.FC = () => {
           {/* CTA row */}
           <div className="hero-actions">
             <button
-              onClick={() => setShowDashboard(true)}
+              onClick={() => navigate("/dashboard")}
               className="btn btn-primary btn-lg"
             >
               <span>Try Extractor Studio</span>
