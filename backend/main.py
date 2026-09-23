@@ -56,7 +56,7 @@ class ErrorResponse(BaseModel):
 
 # --- App Initialization ---
 app = FastAPI(
-    title="ExtractAI PDF Extraction API",
+    title="TheExtractor PDF Extraction API",
     description="High-performance pipeline converting complex PDF documents into structured heading and body-text pairs.",
     version="2.0.0",
     docs_url="/docs",
@@ -77,7 +77,7 @@ app.add_middleware(
 def root():
     """Root endpoint providing service metadata."""
     return {
-        "service": "ExtractAI PDF Extraction API",
+        "service": "TheExtractor PDF Extraction API",
         "version": "2.0.0",
         "status": "operational",
         "endpoints": {
@@ -93,7 +93,7 @@ def health_check():
     """Health check endpoint for liveness and readiness monitoring."""
     return {
         "status": "healthy",
-        "service": "ExtractAI",
+        "service": "TheExtractor",
         "version": "2.0.0"
     }
 

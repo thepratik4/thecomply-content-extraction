@@ -10,6 +10,8 @@ import { ModeToggle } from "./components/mode-toggle";
 import { TourProvider, useTour, type TourStep } from "./components/Tour";
 import { TourConfirmModal } from "./components/TourConfirmModal";
 import { ArrowRight, Compass } from "lucide-react";
+import { useRouter, type DashboardTab } from "./hooks/useRouter";
+import { TheExtractorLogo } from "./components/TheExtractorLogo";
 import "./App.css";
 
 const TOUR_STEPS: TourStep[] = [
@@ -86,6 +88,12 @@ const TOUR_STEPS: TourStep[] = [
   },
 ];
 
+/**
+ * Header button component that triggers the interactive onboarding tour.
+ *
+ * @param props - Component properties, including tab switch and tour request callbacks.
+ * @returns Button element indicating tour status.
+ */
 const TourTriggerButton: React.FC<{
   onSwitchTab?: () => void;
   onRequestTour?: () => void;
@@ -107,22 +115,26 @@ const TourTriggerButton: React.FC<{
   );
 };
 
+/**
+ * Renders the dashboard shell including the collapsible sidebar,
+ * top navigation bar, and active dashboard module workspace.
+ *
+ * @param props - Component properties including current tab and navigation handlers.
+ * @returns Complete dashboard view layout.
+ */
 const DashboardContent: React.FC<{
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  setShowDashboard: (show: boolean) => void;
+  activeTab: DashboardTab;
+  onSelectTab: (tab: DashboardTab) => void;
+  onExitDashboard: () => void;
   onRequestTour: () => void;
-}> = ({ activeTab, setActiveTab, setShowDashboard, onRequestTour }) => {
+}> = ({ activeTab, onSelectTab, onExitDashboard, onRequestTour }) => {
 
   return (
     <SidebarProvider defaultOpen={true}>
       <AppSidebar
         activeItem={activeTab}
-        onSelectItem={setActiveTab}
-        onExitDashboard={() => {
-          setShowDashboard(false);
-          window.location.hash = "";
-        }}
+        onSelectItem={(item) => onSelectTab(item as DashboardTab)}
+        onExitDashboard={onExitDashboard}
       />
       <SidebarInset>
         {/* Dashboard Header with Sidebar Trigger */}
@@ -170,32 +182,10 @@ const DashboardContent: React.FC<{
 
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <TourTriggerButton
-              onSwitchTab={() => setActiveTab("studio")}
+              onSwitchTab={() => onSelectTab("studio")}
               onRequestTour={onRequestTour}
             />
             <ModeToggle />
-            <button
-              onClick={() => {
-                setShowDashboard(false);
-                window.location.hash = "";
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--text-secondary, #52525b)",
-                background: "var(--card-bg, #ffffff)",
-                border: "1px solid var(--border-color, #e4e4e7)",
-                padding: "6px 12px",
-                borderRadius: 6,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-            >
-              ← Back to Landing Page
-            </button>
           </div>
         </header>
 
@@ -231,10 +221,10 @@ const DashboardContent: React.FC<{
                 {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Workspace
               </h3>
               <p style={{ fontSize: 13, color: "#71717a", maxWidth: 400, margin: "0 auto 20px auto" }}>
-                This dashboard module is configured as part of the ExtractAI system.
+                This dashboard module is configured as part of TheExtractor.
               </p>
               <button
-                onClick={() => setActiveTab("studio")}
+                onClick={() => onSelectTab("studio")}
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
@@ -256,42 +246,46 @@ const DashboardContent: React.FC<{
   );
 };
 
+/**
+ * Main application content container managing route state, tour confirmation dialogs,
+ * and switching between the public landing page and the authenticated dashboard.
+ */
 const AppContent: React.FC = () => {
   const { startTour } = useTour();
-  const [showDashboard, setShowDashboard] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<string>("studio");
+  const { navigate, isDashboard, currentTab } = useRouter();
   const [showTourConfirmModal, setShowTourConfirmModal] = useState<boolean>(false);
 
-  // Check URL hash on initial load and on hash change
-  useEffect(() => {
-    const handleHash = () => {
-      if (window.location.hash === "#extractor" || window.location.hash === "#studio") {
-        setShowDashboard(true);
+  const handleSelectTab = useCallback(
+    (tab: DashboardTab) => {
+      if (tab === "studio") {
+        navigate("/dashboard");
+      } else {
+        navigate(`/dashboard/${tab}`);
       }
-    };
-    handleHash();
-    window.addEventListener("hashchange", handleHash);
-    return () => window.removeEventListener("hashchange", handleHash);
-  }, []);
+    },
+    [navigate]
+  );
+
+  const handleExitDashboard = useCallback(() => {
+    navigate("/");
+  }, [navigate]);
 
   const handleRequestTour = useCallback(() => {
     const hasWork = Boolean((window as any).__extractai_has_work);
     if (hasWork) {
       setShowTourConfirmModal(true);
     } else {
-      setShowDashboard(true);
-      setActiveTab("studio");
+      navigate("/dashboard");
       startTour();
     }
-  }, [startTour]);
+  }, [navigate, startTour]);
 
   const handleConfirmTour = useCallback(() => {
     setShowTourConfirmModal(false);
     window.dispatchEvent(new CustomEvent("extractai:reset-workspace"));
-    setShowDashboard(true);
-    setActiveTab("studio");
+    navigate("/dashboard");
     startTour();
-  }, [startTour]);
+  }, [navigate, startTour]);
 
   const handleCancelTourModal = useCallback(() => {
     setShowTourConfirmModal(false);
@@ -299,11 +293,11 @@ const AppContent: React.FC = () => {
 
   return (
     <>
-      {showDashboard ? (
+      {isDashboard ? (
         <DashboardContent
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          setShowDashboard={setShowDashboard}
+          activeTab={currentTab}
+          onSelectTab={handleSelectTab}
+          onExitDashboard={handleExitDashboard}
           onRequestTour={handleRequestTour}
         />
       ) : (
@@ -316,12 +310,11 @@ const AppContent: React.FC = () => {
                 className="nav-logo"
                 onClick={(e) => {
                   e.preventDefault();
-                  setShowDashboard(false);
-                  window.location.hash = "";
+                  navigate("/");
                 }}
               >
-                <span className="nav-logo-square" />
-                <span className="nav-logo-text">Thecomply.ai</span>
+                <TheExtractorLogo size={24} className="nav-brand-icon" />
+                <span className="nav-logo-text">TheExtractor</span>
               </a>
 
               <div className="nav-cta">
@@ -336,7 +329,7 @@ const AppContent: React.FC = () => {
           {/* Eyebrow */}
           <p className="eyebrow">
             <span className="eyebrow-dot" />
-            AI-Powered Document Extraction
+            Automated PDF Document Extraction
           </p>
 
           {/* Headline */}
@@ -356,7 +349,7 @@ const AppContent: React.FC = () => {
           {/* CTA row */}
           <div className="hero-actions">
             <button
-              onClick={() => setShowDashboard(true)}
+              onClick={() => navigate("/dashboard")}
               className="btn btn-primary btn-lg"
             >
               <span>Try Extractor Studio</span>
@@ -429,8 +422,8 @@ const AppContent: React.FC = () => {
       {/* ── Footer ─────────────────────────────────────────────────── */}
       <footer className="footer">
         <div className="footer-inner">
-          <span className="footer-logo">ExtractAI</span>
-          <p className="footer-copy">© 2024 ExtractAI. All rights reserved.</p>
+          <span className="footer-logo">TheExtractor</span>
+          <p className="footer-copy">© 2024 TheExtractor. All rights reserved.</p>
           <div className="footer-links">
             <a href="#privacy">Privacy</a>
             <a href="#terms">Terms</a>
@@ -451,6 +444,9 @@ const AppContent: React.FC = () => {
   );
 };
 
+/**
+ * Root application component wrapping AppContent with TourProvider.
+ */
 const App: React.FC = () => {
   return (
     <TourProvider defaultSteps={TOUR_STEPS}>

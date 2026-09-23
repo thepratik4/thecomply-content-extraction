@@ -158,11 +158,11 @@ const ContractAnimation: React.FC = () => {
             LAYER: Heading Highlights (on document)
         ═══════════════════════════════════════════════════ */}
         <g id="layer-highlights">
-          <rect id="hl-h1" x="62"  y="140" width="148" height="10" rx="2" fill="#c0392b" opacity="0"/>
-          <rect id="hl-h2" x="62"  y="188" width="156" height="10" rx="2" fill="#c0392b" opacity="0"/>
-          <rect id="hl-h3" x="62"  y="236" width="120" height="10" rx="2" fill="#c0392b" opacity="0"/>
-          <rect id="hl-h4" x="62"  y="284" width="132" height="10" rx="2" fill="#c0392b" opacity="0"/>
-          <rect id="hl-h5" x="62"  y="332" width="156" height="10" rx="2" fill="#c0392b" opacity="0"/>
+          <rect id="hl-h1" x="68" y="151" width="98"  height="12" rx="2" fill="#c0392b" opacity="0"/>
+          <rect id="hl-h2" x="68" y="199" width="104" height="12" rx="2" fill="#c0392b" opacity="0"/>
+          <rect id="hl-h3" x="68" y="247" width="68"  height="12" rx="2" fill="#c0392b" opacity="0"/>
+          <rect id="hl-h4" x="68" y="295" width="84"  height="12" rx="2" fill="#c0392b" opacity="0"/>
+          <rect id="hl-h5" x="68" y="336" width="104" height="12" rx="2" fill="#c0392b" opacity="0"/>
         </g>
 
         {/* ═══════════════════════════════════════════════════

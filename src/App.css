@@ -124,6 +124,20 @@ ul { list-style: none; }
   text-decoration: none;
   cursor: pointer;
   user-select: none;
+  transition: opacity 0.15s ease, transform 0.18s ease;
+}
+.nav-logo:hover {
+  opacity: 0.96;
+}
+.nav-brand-icon {
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), filter 0.22s ease, box-shadow 0.22s ease;
+}
+.nav-logo:hover .nav-brand-icon {
+  transform: scale(1.08) rotate(-1.5deg);
+  filter: drop-shadow(0 2px 8px rgba(239, 68, 68, 0.45));
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18);
 }
 .nav-logo-square {
   width: 12px;
@@ -139,6 +153,13 @@ ul { list-style: none; }
   font-weight: 700;
   color: var(--ink);
   letter-spacing: -0.01em;
+  transition: color 0.18s ease;
+}
+.nav-logo:hover .nav-logo-text {
+  color: var(--red);
+}
+.dark .nav-logo:hover .nav-logo-text {
+  color: #f87171;
 }
 .nav-cta {
   display: flex;
