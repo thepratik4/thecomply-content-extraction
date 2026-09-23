@@ -47,14 +47,23 @@ function isDashboardPath(pathname: string): boolean {
  */
 export function useRouter() {
   const [pathname, setPathname] = useState<string>(() => {
-    // Check hash fallback on first load (e.g. #extractor or #studio)
-    if (typeof window !== "undefined") {
-      if (window.location.hash === "#extractor" || window.location.hash === "#studio") {
-        return "/dashboard";
-      }
-      return window.location.pathname || "/";
+    if (typeof window === "undefined") return "/";
+
+    // Restore path saved by public/404.html when Vercel served the SPA fallback
+    // on a hard reload of a deep-link (e.g. /dashboard/documents).
+    const redirectPath = sessionStorage.getItem("spa_redirect_path");
+    if (redirectPath) {
+      sessionStorage.removeItem("spa_redirect_path");
+      // Replace the current history entry so the correct URL shows immediately
+      window.history.replaceState(null, "", redirectPath);
+      return redirectPath;
     }
-    return "/";
+
+    // Check hash fallback on first load (e.g. #extractor or #studio)
+    if (window.location.hash === "#extractor" || window.location.hash === "#studio") {
+      return "/dashboard";
+    }
+    return window.location.pathname || "/";
   });
 
   useEffect(() => {
