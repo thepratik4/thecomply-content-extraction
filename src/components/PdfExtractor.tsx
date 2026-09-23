@@ -389,6 +389,8 @@ export const PdfExtractor: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const uploadTimerRef = useRef<any>(null);
+  const sampleLoadInFlightRef = useRef(false);
+  const workspaceGenerationRef = useRef(0);
 
   // Source PDF URL tracking for auditable provenance
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -429,12 +431,15 @@ export const PdfExtractor: React.FC = () => {
 
   // Upload simulation for smooth UI transition then immediate automatic extraction
   const startUploadAnimation = (selectedFile: File) => {
+    const uploadGeneration = workspaceGenerationRef.current;
     (window as any).__extractai_has_work = true;
     if (uploadTimerRef.current) {
       clearInterval(uploadTimerRef.current);
+      uploadTimerRef.current = null;
     }
     if (extractIntervalRef.current) {
       clearInterval(extractIntervalRef.current);
+      extractIntervalRef.current = null;
     }
 
     setFile(selectedFile);
@@ -450,14 +455,20 @@ export const PdfExtractor: React.FC = () => {
 
     let progress = 0;
     uploadTimerRef.current = setInterval(() => {
+      if (uploadGeneration !== workspaceGenerationRef.current) {
+        if (uploadTimerRef.current) clearInterval(uploadTimerRef.current);
+        uploadTimerRef.current = null;
+        return;
+      }
       progress += Math.floor(Math.random() * 18) + 14;
       if (progress >= 100) {
         progress = 100;
         setUploadProgress(100);
         setIsUploading(false);
-        clearInterval(uploadTimerRef.current);
+        if (uploadTimerRef.current) clearInterval(uploadTimerRef.current);
+        uploadTimerRef.current = null;
         // Automatically start extraction immediately
-        handleExtract(selectedFile);
+        handleExtract(selectedFile, uploadGeneration);
       } else {
         setUploadProgress(progress);
       }
@@ -465,11 +476,13 @@ export const PdfExtractor: React.FC = () => {
   };
 
   const handleLoadSample = async () => {
-    if ((window as any).__extractai_has_work) return;
+    if ((window as any).__extractai_has_work || sampleLoadInFlightRef.current) return;
+    sampleLoadInFlightRef.current = true;
     try {
       setIsLoading(true);
       setError(null);
       const res = await fetch("/sample-document.pdf");
+      if (!res.ok) throw new Error("Failed to load sample document.");
       const blob = await res.blob();
       // Recheck for user work immediately before applying sample or calling startUploadAnimation
       if ((window as any).__extractai_has_work) return;
@@ -480,6 +493,7 @@ export const PdfExtractor: React.FC = () => {
     } catch {
       setError("Failed to load sample document.");
     } finally {
+      sampleLoadInFlightRef.current = false;
       setIsLoading(false);
     }
   };
@@ -504,6 +518,15 @@ export const PdfExtractor: React.FC = () => {
   // Listen for reset workspace trigger (e.g. from Tour restart confirmation)
   useEffect(() => {
     const handleReset = () => {
+      workspaceGenerationRef.current += 1;
+      if (uploadTimerRef.current) {
+        clearInterval(uploadTimerRef.current);
+        uploadTimerRef.current = null;
+      }
+      if (extractIntervalRef.current) {
+        clearInterval(extractIntervalRef.current);
+        extractIntervalRef.current = null;
+      }
       setFile(null);
       setResults(null);
       setRawApiResponse(null);
@@ -583,7 +606,11 @@ export const PdfExtractor: React.FC = () => {
   };
 
   // Run extraction via POST /api/extract
-  const handleExtract = async (fileToExtract?: File) => {
+  const handleExtract = async (
+    fileToExtract?: File,
+    generation = workspaceGenerationRef.current
+  ) => {
+    if (generation !== workspaceGenerationRef.current) return;
     const targetFile = fileToExtract || file;
     if (!targetFile) {
       setError("Please select a document first.");
@@ -603,6 +630,13 @@ export const PdfExtractor: React.FC = () => {
     }
 
     extractIntervalRef.current = setInterval(() => {
+      if (generation !== workspaceGenerationRef.current) {
+        if (extractIntervalRef.current) {
+          clearInterval(extractIntervalRef.current);
+          extractIntervalRef.current = null;
+        }
+        return;
+      }
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       setElapsedSeconds(elapsed);
 
@@ -643,8 +677,11 @@ export const PdfExtractor: React.FC = () => {
         });
       }
 
+      if (generation !== workspaceGenerationRef.current) return;
+
       if (extractIntervalRef.current) {
         clearInterval(extractIntervalRef.current);
+        extractIntervalRef.current = null;
       }
       setExtractProgress(100);
 
@@ -656,6 +693,8 @@ export const PdfExtractor: React.FC = () => {
       }
 
       const json = await response.json();
+      if (generation !== workspaceGenerationRef.current) return;
+
       setRawApiResponse(json);
 
       if (json.success && Array.isArray(json.data)) {
@@ -717,18 +756,23 @@ export const PdfExtractor: React.FC = () => {
         throw new Error("Unexpected response format from extraction engine.");
       }
     } catch (err: any) {
+      if (generation !== workspaceGenerationRef.current) return;
       if (extractIntervalRef.current) {
         clearInterval(extractIntervalRef.current);
+        extractIntervalRef.current = null;
       }
       console.warn("Extraction failed:", err);
       setError(
         err?.message || "Failed to extract document. Ensure the document is not password protected."
       );
     } finally {
-      if (extractIntervalRef.current) {
-        clearInterval(extractIntervalRef.current);
+      if (generation === workspaceGenerationRef.current) {
+        if (extractIntervalRef.current) {
+          clearInterval(extractIntervalRef.current);
+          extractIntervalRef.current = null;
+        }
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
   };
 
