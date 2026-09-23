@@ -6,7 +6,7 @@ import { ThemeProvider } from './components/theme-provider.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider defaultTheme="system" storageKey="extractai_theme">
+    <ThemeProvider defaultTheme="light" storageKey="extractai_theme">
       <App />
     </ThemeProvider>
   </StrictMode>,
