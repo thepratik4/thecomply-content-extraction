@@ -1,0 +1,513 @@
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Guided Product Tour Styles
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.tour-overlay-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* 4-Panel Backdrop surrounding spotlight cutout (leaves cutout 100% open with zero pointer obstruction) */
+.tour-backdrop-panel {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.68);
+  pointer-events: auto;
+  z-index: 10000;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Glowing border highlighting the active element */
+.tour-spotlight-border {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10001;
+  border: 2px solid #e11d48;
+  box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.2), 0 0 24px rgba(225, 29, 72, 0.35);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: tourPulse 2.4s infinite ease-in-out;
+}
+
+@keyframes tourPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.2), 0 0 24px rgba(225, 29, 72, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 7px rgba(225, 29, 72, 0.3), 0 0 32px rgba(225, 29, 72, 0.55);
+  }
+}
+
+/* Floating Callout Card */
+.tour-card {
+  position: fixed;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: var(--card-bg, #ffffff);
+  border: 1px solid var(--border-color, #e4e4e7);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.25), 0 0 1px 1px rgba(0, 0, 0, 0.05);
+  z-index: 10002;
+  pointer-events: auto;
+  font-family: inherit;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dark .tour-card {
+  background: #18181c;
+  border-color: #2e2e36;
+  box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px #27272a;
+}
+
+/* Card Header */
+.tour-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tour-card-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tour-card-step-badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(225, 29, 72, 0.08);
+  color: #e11d48;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  border: 1px solid rgba(225, 29, 72, 0.2);
+}
+
+.dark .tour-card-step-badge {
+  background: rgba(225, 29, 72, 0.16);
+  color: #fda4af;
+  border-color: rgba(225, 29, 72, 0.3);
+}
+
+.tour-card-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #71717a);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tour-card-close-btn:hover {
+  background: var(--card-subtle-bg, #f4f4f5);
+  color: var(--text-primary, #18181b);
+}
+
+.dark .tour-card-close-btn:hover {
+  background: #27272a;
+  color: #f4f4f5;
+}
+
+/* Card Title & Description */
+.tour-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary, #18181b);
+  margin: 0;
+  line-height: 1.35;
+}
+
+.dark .tour-card-title {
+  color: #ffffff;
+}
+
+.tour-card-desc {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary, #52525b);
+  margin: 0;
+}
+
+.dark .tour-card-desc {
+  color: #a1a1aa;
+}
+
+/* Optional Custom Action (e.g. Load Sample Document button) */
+.tour-card-action-extra {
+  margin-top: 2px;
+}
+
+.btn-tour-extra {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px dashed rgba(225, 29, 72, 0.45);
+  background: rgba(225, 29, 72, 0.05);
+  color: #e11d48;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-tour-extra:hover {
+  background: rgba(225, 29, 72, 0.12);
+}
+
+.dark .btn-tour-extra {
+  background: rgba(225, 29, 72, 0.1);
+  color: #fda4af;
+  border-color: rgba(225, 29, 72, 0.45);
+}
+
+.dark .btn-tour-extra:hover {
+  background: rgba(225, 29, 72, 0.2);
+}
+
+/* Card Footer Controls */
+.tour-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle, #f4f4f5);
+}
+
+.dark .tour-card-footer {
+  border-top-color: #27272a;
+}
+
+.tour-card-skip-btn {
+  font-size: 12px;
+  color: var(--text-muted, #71717a);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+
+.tour-card-skip-btn:hover {
+  color: var(--text-primary, #18181b);
+}
+
+.dark .tour-card-skip-btn:hover {
+  color: #f4f4f5;
+}
+
+.tour-card-nav-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-tour-prev {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e4e4e7);
+  background: var(--card-bg, #ffffff);
+  color: var(--text-secondary, #52525b);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-tour-prev:hover {
+  background: var(--card-subtle-bg, #f4f4f5);
+  color: var(--text-primary, #18181b);
+}
+
+.dark .btn-tour-prev {
+  background: #202025;
+  border-color: #2e2e36;
+  color: #d4d4d8;
+}
+
+.dark .btn-tour-prev:hover {
+  background: #27272e;
+  color: #ffffff;
+}
+
+.btn-tour-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: none;
+  background: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(225, 29, 72, 0.35);
+  transition: all 0.15s ease;
+}
+
+.btn-tour-next:hover {
+  filter: brightness(1.08);
+  transform: translateY(-0.5px);
+  box-shadow: 0 3px 8px rgba(225, 29, 72, 0.45);
+}
+
+/* Header Trigger Button (Pill in Top Navbar) */
+.btn-tour-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--red, #c0392b);
+  background: rgba(192, 57, 43, 0.06);
+  border: 1px solid rgba(192, 57, 43, 0.22);
+  padding: 5px 12px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-tour-trigger:hover {
+  background: rgba(192, 57, 43, 0.12);
+  border-color: rgba(192, 57, 43, 0.4);
+  transform: translateY(-0.5px);
+}
+
+.dark .btn-tour-trigger {
+  color: #fda4af;
+  background: rgba(225, 29, 72, 0.12);
+  border-color: rgba(225, 29, 72, 0.3);
+}
+
+.dark .btn-tour-trigger:hover {
+  background: rgba(225, 29, 72, 0.2);
+  border-color: rgba(225, 29, 72, 0.5);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Step 1: Floating Draggable Sample PDF & Path Guide
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.tour-drag-guide-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+.tour-drag-path-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+@keyframes tour-dash-flow {
+  from {
+    stroke-dashoffset: 24;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.tour-animated-dash {
+  animation: tour-dash-flow 0.8s linear infinite;
+}
+
+@keyframes tour-levitate {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+    box-shadow: 0 8px 20px -3px rgba(225, 29, 72, 0.25), 0 0 0 1px rgba(225, 29, 72, 0.3);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 14px 28px -4px rgba(225, 29, 72, 0.35), 0 0 0 1.5px rgba(225, 29, 72, 0.45);
+  }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Step 1: Desktop PDF File Document Component (Reference-Matched)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.tour-desktop-file {
+  position: absolute;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1.5px solid rgba(225, 29, 72, 0.28);
+  box-shadow: 0 6px 20px -3px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(225, 29, 72, 0.08);
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  z-index: 10003;
+  animation: tour-file-float 3.2s ease-in-out infinite;
+}
+
+@keyframes tour-file-float {
+  0%, 100% {
+    transform: translateY(0px);
+    box-shadow: 0 6px 20px -3px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(225, 29, 72, 0.08);
+  }
+  50% {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 26px -4px rgba(225, 29, 72, 0.22), 0 0 0 1.5px rgba(225, 29, 72, 0.25);
+  }
+}
+
+.tour-desktop-file:hover {
+  transform: translateY(-5px) scale(1.02);
+  border-color: #e11d48;
+  box-shadow: 0 14px 30px -5px rgba(225, 29, 72, 0.32), 0 0 0 2px rgba(225, 29, 72, 0.35);
+}
+
+.tour-desktop-file:active {
+  transform: scale(0.97);
+}
+
+.dark .tour-desktop-file {
+  background: #18181b;
+  border-color: rgba(225, 29, 72, 0.35);
+  box-shadow: 0 10px 24px -5px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Paper Sheet with Dog-Ear Fold */
+.tour-file-sheet {
+  position: relative;
+  width: 52px;
+  height: 64px;
+  background: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Dog-ear corner fold */
+.tour-file-corner {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 13px;
+  height: 13px;
+  background: #e2e8f0;
+  border-bottom-left-radius: 3px;
+  border-left: 1px solid #94a3b8;
+  border-bottom: 1px solid #94a3b8;
+  z-index: 2;
+  box-shadow: -1px 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* Simulated text lines on sheet */
+.tour-file-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 6px 0 6px;
+}
+
+.tour-file-lines.lower {
+  padding: 0 6px 6px 6px;
+}
+
+.tour-file-line {
+  height: 2px;
+  background: #cbd5e1;
+  border-radius: 1px;
+}
+
+.tour-file-line.line-1 { width: 55%; }
+.tour-file-line.line-2 { width: 85%; }
+.tour-file-line.line-3 { width: 70%; }
+.tour-file-line.line-4 { width: 80%; }
+.tour-file-line.line-5 { width: 50%; }
+
+/* Bold Red PDF Banner across middle */
+.tour-file-banner {
+  background: #e11d48;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-align: center;
+  padding: 2.5px 0;
+  width: 100%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Metadata underneath */
+.tour-file-meta-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+
+.tour-file-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.dark .tour-file-name {
+  color: #f8fafc;
+}
+
+.tour-file-hint-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #e11d48;
+  background: rgba(225, 29, 72, 0.08);
+  border: 1px solid rgba(225, 29, 72, 0.2);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.01em;
+}
+
+.dark .tour-file-hint-badge {
+  background: rgba(225, 29, 72, 0.16);
+  border-color: rgba(225, 29, 72, 0.35);
+  color: #fda4af;
+}

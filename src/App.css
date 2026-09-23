@@ -266,6 +266,41 @@ ul { list-style: none; }
   align-items: center;
 }
 
+.btn-hero-tour {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface, #ffffff);
+  border: 1.5px solid var(--red-border, #f2d1cc);
+  color: var(--red, #c0392b);
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(192, 57, 43, 0.08);
+}
+
+.btn-hero-tour:hover {
+  background: var(--red-soft, #fbf0ee);
+  border-color: var(--red, #c0392b);
+  color: #a93226;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(192, 57, 43, 0.16);
+}
+
+.dark .btn-hero-tour {
+  background: rgba(225, 29, 72, 0.1);
+  border: 1.5px solid rgba(225, 29, 72, 0.32);
+  color: #fda4af;
+  box-shadow: 0 2px 8px rgba(225, 29, 72, 0.12);
+}
+
+.dark .btn-hero-tour:hover {
+  background: rgba(225, 29, 72, 0.18);
+  border-color: #f43f5e;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(225, 29, 72, 0.25);
+}
+
 /* ── Output format hint ──────────────────────────────── */
 .output-hint {
   display: flex;

@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Loader2,
   ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import { type ExtractedSection, type ExtractedTable } from "../mockData";
 import {
@@ -388,6 +389,8 @@ export const PdfExtractor: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const uploadTimerRef = useRef<any>(null);
+  const sampleLoadInFlightRef = useRef(false);
+  const workspaceGenerationRef = useRef(0);
 
   // Source PDF URL tracking for auditable provenance
   const [fileUrl, setFileUrl] = useState<string | null>(null);
@@ -426,10 +429,17 @@ export const PdfExtractor: React.FC = () => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  // Upload simulation for smooth UI transition
+  // Upload simulation for smooth UI transition then immediate automatic extraction
   const startUploadAnimation = (selectedFile: File) => {
+    const uploadGeneration = workspaceGenerationRef.current;
+    (window as any).__extractai_has_work = true;
     if (uploadTimerRef.current) {
       clearInterval(uploadTimerRef.current);
+      uploadTimerRef.current = null;
+    }
+    if (extractIntervalRef.current) {
+      clearInterval(extractIntervalRef.current);
+      extractIntervalRef.current = null;
     }
 
     setFile(selectedFile);
@@ -445,24 +455,37 @@ export const PdfExtractor: React.FC = () => {
 
     let progress = 0;
     uploadTimerRef.current = setInterval(() => {
-      progress += Math.floor(Math.random() * 9) + 6;
+      if (uploadGeneration !== workspaceGenerationRef.current) {
+        if (uploadTimerRef.current) clearInterval(uploadTimerRef.current);
+        uploadTimerRef.current = null;
+        return;
+      }
+      progress += Math.floor(Math.random() * 18) + 14;
       if (progress >= 100) {
         progress = 100;
         setUploadProgress(100);
         setIsUploading(false);
-        clearInterval(uploadTimerRef.current);
+        if (uploadTimerRef.current) clearInterval(uploadTimerRef.current);
+        uploadTimerRef.current = null;
+        // Automatically start extraction immediately
+        handleExtract(selectedFile, uploadGeneration);
       } else {
         setUploadProgress(progress);
       }
-    }, 45);
+    }, 35);
   };
 
   const handleLoadSample = async () => {
+    if ((window as any).__extractai_has_work || sampleLoadInFlightRef.current) return;
+    sampleLoadInFlightRef.current = true;
     try {
       setIsLoading(true);
       setError(null);
       const res = await fetch("/sample-document.pdf");
+      if (!res.ok) throw new Error("Failed to load sample document.");
       const blob = await res.blob();
+      // Recheck for user work immediately before applying sample or calling startUploadAnimation
+      if ((window as any).__extractai_has_work) return;
       const sampleFile = new File([blob], "AMGN-135003565.pdf", {
         type: "application/pdf",
       });
@@ -470,9 +493,55 @@ export const PdfExtractor: React.FC = () => {
     } catch {
       setError("Failed to load sample document.");
     } finally {
+      sampleLoadInFlightRef.current = false;
       setIsLoading(false);
     }
   };
+
+  // Listen for external trigger to load sample document (e.g. from Guided Tour)
+  useEffect(() => {
+    const onExternalLoadSample = () => {
+      handleLoadSample();
+    };
+    window.addEventListener("extractai:load-sample", onExternalLoadSample);
+    return () => window.removeEventListener("extractai:load-sample", onExternalLoadSample);
+  }, []);
+
+  // Track whether there is active work in progress for Tour restart confirmation
+  useEffect(() => {
+    (window as any).__extractai_has_work = Boolean(file || results);
+    return () => {
+      (window as any).__extractai_has_work = false;
+    };
+  }, [file, results]);
+
+  // Listen for reset workspace trigger (e.g. from Tour restart confirmation)
+  useEffect(() => {
+    const handleReset = () => {
+      workspaceGenerationRef.current += 1;
+      if (uploadTimerRef.current) {
+        clearInterval(uploadTimerRef.current);
+        uploadTimerRef.current = null;
+      }
+      if (extractIntervalRef.current) {
+        clearInterval(extractIntervalRef.current);
+        extractIntervalRef.current = null;
+      }
+      setFile(null);
+      setResults(null);
+      setRawApiResponse(null);
+      setMeta(null);
+      setError(null);
+      setIsLoading(false);
+      setIsUploading(false);
+      setSearchQuery("");
+      setSelectedSectionIndex(0);
+      setExpandedSubsections({});
+      (window as any).__extractai_has_work = false;
+    };
+    window.addEventListener("extractai:reset-workspace", handleReset);
+    return () => window.removeEventListener("extractai:reset-workspace", handleReset);
+  }, []);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -491,10 +560,22 @@ export const PdfExtractor: React.FC = () => {
     e.stopPropagation();
     setIsDragging(false);
 
+    // Check if sample document from Guided Tour was dropped
+    if (
+      e.dataTransfer.types.includes("application/extractai-sample") ||
+      e.dataTransfer.getData("application/extractai-sample") ||
+      e.dataTransfer.getData("text/plain") === "AMGN-135003565.pdf"
+    ) {
+      handleLoadSample();
+      window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
+      return;
+    }
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFile = e.dataTransfer.files[0];
       if (droppedFile.type === "application/pdf" || droppedFile.name.toLowerCase().endsWith(".pdf")) {
         startUploadAnimation(droppedFile);
+        window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
       } else {
         setError("Please upload a valid PDF document (.pdf).");
       }
@@ -506,6 +587,7 @@ export const PdfExtractor: React.FC = () => {
       const selectedFile = e.target.files[0];
       if (selectedFile.type === "application/pdf" || selectedFile.name.toLowerCase().endsWith(".pdf")) {
         startUploadAnimation(selectedFile);
+        window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
       } else {
         setError("Please select a valid PDF document (.pdf).");
       }
@@ -524,8 +606,13 @@ export const PdfExtractor: React.FC = () => {
   };
 
   // Run extraction via POST /api/extract
-  const handleExtract = async () => {
-    if (!file) {
+  const handleExtract = async (
+    fileToExtract?: File,
+    generation = workspaceGenerationRef.current
+  ) => {
+    if (generation !== workspaceGenerationRef.current) return;
+    const targetFile = fileToExtract || file;
+    if (!targetFile) {
       setError("Please select a document first.");
       return;
     }
@@ -543,6 +630,13 @@ export const PdfExtractor: React.FC = () => {
     }
 
     extractIntervalRef.current = setInterval(() => {
+      if (generation !== workspaceGenerationRef.current) {
+        if (extractIntervalRef.current) {
+          clearInterval(extractIntervalRef.current);
+          extractIntervalRef.current = null;
+        }
+        return;
+      }
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       setElapsedSeconds(elapsed);
 
@@ -567,7 +661,7 @@ export const PdfExtractor: React.FC = () => {
     }, 800);
 
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("file", targetFile);
 
     try {
       let response: Response;
@@ -583,8 +677,11 @@ export const PdfExtractor: React.FC = () => {
         });
       }
 
+      if (generation !== workspaceGenerationRef.current) return;
+
       if (extractIntervalRef.current) {
         clearInterval(extractIntervalRef.current);
+        extractIntervalRef.current = null;
       }
       setExtractProgress(100);
 
@@ -596,6 +693,8 @@ export const PdfExtractor: React.FC = () => {
       }
 
       const json = await response.json();
+      if (generation !== workspaceGenerationRef.current) return;
+
       setRawApiResponse(json);
 
       if (json.success && Array.isArray(json.data)) {
@@ -612,8 +711,8 @@ export const PdfExtractor: React.FC = () => {
           processingTimeSec: m.extraction_time_ms
             ? m.extraction_time_ms / 1000
             : json.processing_time_sec,
-          fileName: m.file_name ?? file.name,
-          fileSize: m.file_size ?? formatFileSize(file.size),
+          fileName: m.file_name ?? targetFile.name,
+          fileSize: m.file_size ?? formatFileSize(targetFile.size),
           sectionsFound: m.sections_found ?? json.data.length,
           language: m.language ?? "en",
         });
@@ -623,7 +722,7 @@ export const PdfExtractor: React.FC = () => {
           try {
             const docRecord = {
               id: `doc-${Date.now()}`,
-              fileName: m.file_name ?? file.name,
+              fileName: m.file_name ?? targetFile.name,
               uploadDate: new Date().toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -631,7 +730,7 @@ export const PdfExtractor: React.FC = () => {
               }),
               sectionsCount: json.data.length,
               totalPages: m.total_pages ?? json.total_pages ?? 1,
-              fileSize: m.file_size ?? formatFileSize(file.size),
+              fileSize: m.file_size ?? formatFileSize(targetFile.size),
               status: "Processed",
               sections: json.data,
             };
@@ -639,7 +738,7 @@ export const PdfExtractor: React.FC = () => {
               localStorage.getItem("extractai_processed_documents") || "[]"
             );
             const filtered = existing.filter(
-              (d: any) => d.fileName !== (m.file_name ?? file.name)
+              (d: any) => d.fileName !== (m.file_name ?? targetFile.name)
             );
             localStorage.setItem(
               "extractai_processed_documents",
@@ -657,18 +756,23 @@ export const PdfExtractor: React.FC = () => {
         throw new Error("Unexpected response format from extraction engine.");
       }
     } catch (err: any) {
+      if (generation !== workspaceGenerationRef.current) return;
       if (extractIntervalRef.current) {
         clearInterval(extractIntervalRef.current);
+        extractIntervalRef.current = null;
       }
       console.warn("Extraction failed:", err);
       setError(
         err?.message || "Failed to extract document. Ensure the document is not password protected."
       );
     } finally {
-      if (extractIntervalRef.current) {
-        clearInterval(extractIntervalRef.current);
+      if (generation === workspaceGenerationRef.current) {
+        if (extractIntervalRef.current) {
+          clearInterval(extractIntervalRef.current);
+          extractIntervalRef.current = null;
+        }
+        setIsLoading(false);
       }
-      setIsLoading(false);
     }
   };
 
@@ -872,7 +976,12 @@ export const PdfExtractor: React.FC = () => {
             STATE 1: No document selected → Upload zone
             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         {!file && (
-          <div className="upload-wrapper">
+          <div
+            id="tour-dropzone"
+            className="upload-wrapper"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+          >
             <div
               className={`dropzone ${isDragging ? "dropzone--dragging" : ""}`}
               onDragOver={handleDragOver}
@@ -905,6 +1014,7 @@ export const PdfExtractor: React.FC = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       handleLoadSample();
+                      window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
                     }}
                     style={{
                       fontSize: 11.5,
@@ -990,10 +1100,14 @@ export const PdfExtractor: React.FC = () => {
                           <CheckCircle2 size={13} className="status-icon-check" />
                           <span>Extracted</span>
                         </span>
+                      ) : error ? (
+                        <span className="status-badge" style={{ color: "var(--destructive, #ef4444)" }}>
+                          <span>Extraction failed</span>
+                        </span>
                       ) : (
-                        <span className="status-badge status-badge--ready">
-                          <CheckCircle2 size={13} className="status-icon-check" />
-                          <span>Ready to extract</span>
+                        <span className="status-badge status-badge--loading">
+                          <Spinner size="xs" className="text-current" />
+                          <span>Starting extraction...</span>
                         </span>
                       )}
                     </span>
@@ -1014,24 +1128,15 @@ export const PdfExtractor: React.FC = () => {
                   <span>Change file</span>
                 </button>
 
-                {!results && (
+                {error && !isLoading && (
                   <button
                     type="button"
-                    className={`btn-extract-primary ${isLoading ? "btn-extract-primary--loading" : ""}`}
-                    onClick={handleExtract}
-                    disabled={isLoading || isUploading}
+                    className="btn-extract-primary"
+                    onClick={() => handleExtract()}
+                    title="Retry extraction"
                   >
-                    {isLoading ? (
-                      <>
-                        <Spinner size="sm" className="text-current" />
-                        <span>Extracting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Extract Document</span>
-                        <ArrowRight size={14} />
-                      </>
-                    )}
+                    <RefreshCw size={13} />
+                    <span>Retry</span>
                   </button>
                 )}
               </div>
@@ -1043,7 +1148,7 @@ export const PdfExtractor: React.FC = () => {
                 <X size={16} className="error-icon" />
                 <div className="error-content">
                   <p className="error-msg">{error}</p>
-                  <button type="button" className="error-retry-link" onClick={handleExtract}>
+                  <button type="button" className="error-retry-link" onClick={() => handleExtract()}>
                     Retry extraction
                   </button>
                 </div>
@@ -1103,7 +1208,7 @@ export const PdfExtractor: React.FC = () => {
 
                     <div className="results-header-controls">
                       {/* View Switcher Tabs: [ Structured ] [ Tables ] [ JSON ] */}
-                      <div className="results-view-tabs" role="tablist">
+                      <div id="tour-view-tabs" className="results-view-tabs" role="tablist">
                         <button
                           type="button"
                           role="tab"
@@ -1137,7 +1242,7 @@ export const PdfExtractor: React.FC = () => {
                       </div>
 
                       {/* Header Actions */}
-                      <div className="results-button-actions">
+                      <div id="tour-export-actions" className="results-button-actions">
                         <button
                           type="button"
                           className="btn-results-action"
@@ -1174,9 +1279,9 @@ export const PdfExtractor: React.FC = () => {
                   {viewMode === "structured" && (
                     <div className="document-explorer">
                       {/* LEFT: Section Navigator */}
-                      <aside className="explorer-nav-panel">
+                      <aside id="tour-navigator" className="explorer-nav-panel">
                         {/* Search sections */}
-                        <div className="explorer-search-box">
+                        <div id="tour-search" className="explorer-search-box">
                           <Search size={14} className="explorer-search-icon" />
                           <input
                             type="text"
@@ -1267,7 +1372,7 @@ export const PdfExtractor: React.FC = () => {
                           <article className="section-detail-card">
                             {/* Section Header */}
                             <div className="section-detail-header">
-                              <div className="section-detail-meta">
+                              <div id="tour-traceability" className="section-detail-meta">
                                 <span className="section-badge-num">
                                   SECTION {String(selectedSectionIndex + 1).padStart(2, "0")}
                                 </span>
@@ -1301,7 +1406,7 @@ export const PdfExtractor: React.FC = () => {
                                   {highlightMatch(selectedSection.heading, searchQuery)}
                                 </h2>
 
-                                <div className="section-header-actions">
+                                <div id="tour-section-actions" className="section-header-actions">
                                   {currentSubsections.length > 1 && (
                                     <button
                                       type="button"

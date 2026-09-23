@@ -162,7 +162,7 @@ export function AppSidebar({
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
-              <SidebarMenuItem>
+              <SidebarMenuItem id="tour-batch-nav">
                 <SidebarMenuButton
                   isActive={activeItem === "batch"}
                   onClick={() => handleSelect("batch")}
