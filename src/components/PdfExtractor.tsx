@@ -429,6 +429,7 @@ export const PdfExtractor: React.FC = () => {
 
   // Upload simulation for smooth UI transition then immediate automatic extraction
   const startUploadAnimation = (selectedFile: File) => {
+    (window as any).__extractai_has_work = true;
     if (uploadTimerRef.current) {
       clearInterval(uploadTimerRef.current);
     }
@@ -464,11 +465,14 @@ export const PdfExtractor: React.FC = () => {
   };
 
   const handleLoadSample = async () => {
+    if ((window as any).__extractai_has_work) return;
     try {
       setIsLoading(true);
       setError(null);
       const res = await fetch("/sample-document.pdf");
       const blob = await res.blob();
+      // Recheck for user work immediately before applying sample or calling startUploadAnimation
+      if ((window as any).__extractai_has_work) return;
       const sampleFile = new File([blob], "AMGN-135003565.pdf", {
         type: "application/pdf",
       });

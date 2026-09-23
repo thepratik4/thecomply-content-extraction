@@ -22,7 +22,9 @@ const TOUR_STEPS: TourStep[] = [
     position: "bottom",
     actionText: "Load Sample Document (AMGN-135003565.pdf)",
     onAction: () => {
-      window.dispatchEvent(new CustomEvent("extractai:load-sample"));
+      if (!(window as any).__extractai_has_work) {
+        window.dispatchEvent(new CustomEvent("extractai:load-sample"));
+      }
       window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
     },
   },

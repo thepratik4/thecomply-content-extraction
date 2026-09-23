@@ -156,11 +156,25 @@ export const TourProvider: React.FC<TourProviderProps> = ({
     } else {
       // If target element is not in DOM:
       if (currentStepIndex === 0) {
-        // Step 1: dropzone is temporarily absent, keep branch as no-op
+        // Step 1: fall back to compact document bar or loading container when retained work hides tour-dropzone
+        const docBar =
+          document.querySelector(".compact-document-bar") ||
+          document.querySelector(".extract-loading-container");
+        if (docBar) {
+          const r = docBar.getBoundingClientRect();
+          setElementRect({
+            top: r.top,
+            left: r.left,
+            width: r.width,
+            height: r.height,
+          });
+        }
       } else {
         // For Step 2 or others while results are still loading:
         // Highlight the compact document bar / loading progress bar if present
-        const docBar = document.querySelector(".compact-document-bar") || document.querySelector(".extract-loading-container");
+        const docBar =
+          document.querySelector(".compact-document-bar") ||
+          document.querySelector(".extract-loading-container");
         if (docBar) {
           const r = docBar.getBoundingClientRect();
           setElementRect({
@@ -244,7 +258,7 @@ export const TourProvider: React.FC<TourProviderProps> = ({
   const prevStep = useCallback(() => {
     if (currentStepIndex <= 0) return;
     const nextIdx = currentStepIndex - 1;
-    if (nextIdx === 0) {
+    if (nextIdx === 0 && !(window as any).__extractai_has_work) {
       window.dispatchEvent(new CustomEvent("extractai:reset-workspace"));
     }
     setCurrentStepIndex(nextIdx);
@@ -444,7 +458,9 @@ export const TourProvider: React.FC<TourProviderProps> = ({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    window.dispatchEvent(new CustomEvent("extractai:load-sample"));
+                    if (!(window as any).__extractai_has_work) {
+                      window.dispatchEvent(new CustomEvent("extractai:load-sample"));
+                    }
                     window.dispatchEvent(new CustomEvent("extractai:tour-next-step"));
                   }}
                   title="Click to load sample document (or drag into box)"
