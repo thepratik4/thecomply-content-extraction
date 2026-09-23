@@ -1,7 +1,8 @@
 import path from 'path'
 import fs from 'fs'
 import react from '@vitejs/plugin-react'
-import { defineConfig, Plugin } from 'vite'
+import { defineConfig } from 'vite'
+import type { Plugin } from 'vite'
 
 /**
  * Vite plugin: copies dist/index.html → dist/404.html after every build.
