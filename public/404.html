@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TheExtractor</title>
+    <script>
+      /**
+       * SPA reload fallback for Vercel static hosting.
+       *
+       * When a user reloads on a client-side route (e.g. /dashboard/documents),
+       * Vercel cannot find a matching static file and falls back to this 404.html.
+       * We save the full requested URL into sessionStorage, then redirect to the
+       * app root (/). The React app reads the saved path on startup and navigates
+       * to it client-side — no 404 visible to the user.
+       */
+      (function () {
+        var location = window.location;
+        var path = location.pathname + location.search + location.hash;
+        // Only save meaningful paths — avoid storing the 404.html path itself
+        if (path && path !== '/' && path !== '/404.html') {
+          sessionStorage.setItem('spa_redirect_path', path);
+        }
+        // Redirect to app root so index.html boots normally
+        location.replace('/');
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
