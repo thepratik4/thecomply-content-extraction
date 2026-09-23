@@ -10,7 +10,18 @@ import { useTheme } from "./theme-provider"
  */
 export function ModeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme()
-  const isDark = theme === "dark"
+  const [isSystemDark, setIsSystemDark] = React.useState(false)
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return
+    const mq = window.matchMedia("(prefers-color-scheme: dark)")
+    setIsSystemDark(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsSystemDark(e.matches)
+    mq.addEventListener("change", handler)
+    return () => mq.removeEventListener("change", handler)
+  }, [])
+
+  const isDark = theme === "dark" || (theme === "system" && isSystemDark)
 
   /**
    * Toggles between dark and light themes.
