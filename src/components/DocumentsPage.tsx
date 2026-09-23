@@ -311,6 +311,12 @@ function getTableCellClass(colName: string, totalCols: number, cIdx: number): st
   return "td-cell-regular";
 }
 
+/**
+ * Cleans and normalizes cell content for tabular presentation.
+ *
+ * @param cell - Raw cell string.
+ * @returns Cleaned and formatted string.
+ */
 function formatCellContent(cell: string): string {
   if (!cell) return "";
   let cleaned = cell.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim();
@@ -318,7 +324,52 @@ function formatCellContent(cell: string): string {
   return cleaned;
 }
 
+/**
+ * Safely copies text to the system clipboard, falling back to a hidden textarea
+ * element when the Clipboard API is unavailable or rejected.
+ *
+ * @param text - Plain text string to copy.
+ * @returns Promise resolving to true if copied successfully, false otherwise.
+ */
+async function copyToClipboard(text: string): Promise<boolean> {
+  if (
+    typeof navigator !== "undefined" &&
+    navigator.clipboard &&
+    typeof navigator.clipboard.writeText === "function"
+  ) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through to DOM fallback
+    }
+  }
+
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand("copy");
+    document.body.removeChild(textArea);
+    return successful;
+  } catch {
+    return false;
+  }
+}
+
+
 /* ─── Main Component ─────────────────────────────────────── */
+/**
+ * Documents management page displaying saved extraction history and detailed
+ * section explorer with structured, tables, and JSON representations.
+ *
+ * @returns Complete Documents view component.
+ */
 export const DocumentsPage: React.FC = () => {
   const [documents, setDocuments] = useState<ProcessedDocument[]>(() => {
     try {
@@ -375,8 +426,8 @@ export const DocumentsPage: React.FC = () => {
   // Detail View: Selected section
   const selectedSection = useMemo(() => {
     if (!selectedDoc || selectedDoc.sections.length === 0) return null;
-    return filteredSections[selectedSectionIndex] || selectedDoc.sections[0];
-  }, [selectedDoc, filteredSections, selectedSectionIndex]);
+    return selectedDoc.sections[selectedSectionIndex] || selectedDoc.sections[0];
+  }, [selectedDoc, selectedSectionIndex]);
 
   // Detail View: Subsections
   const currentSubsections = useMemo(() => {
@@ -442,14 +493,30 @@ export const DocumentsPage: React.FC = () => {
   };
 
   // Copy handlers
-  const handleCopyCurrentSection = (index: number, section: ExtractedSection) => {
+  /**
+   * Copies the current section heading and body to the clipboard.
+   *
+   * @param index - Index of the section being copied.
+   * @param section - Section content object.
+   */
+  const handleCopyCurrentSection = async (index: number, section: ExtractedSection) => {
     const formatted = `## ${section.heading}\n\n${section.text}`;
-    navigator.clipboard.writeText(formatted);
-    setCopiedSectionIndex(index);
-    setTimeout(() => setCopiedSectionIndex(null), 1800);
+    const ok = await copyToClipboard(formatted);
+    if (ok) {
+      setCopiedSectionIndex(index);
+      setTimeout(() => setCopiedSectionIndex(null), 1800);
+    }
   };
 
-  const handleCopySubsection = (
+  /**
+   * Copies a subsection title, paragraphs, and formatted tables to the clipboard.
+   *
+   * @param subKey - Unique identifier for the subsection.
+   * @param title - Subsection heading.
+   * @param content - Subsection body text.
+   * @param tables - Optional extracted tables attached to subsection.
+   */
+  const handleCopySubsection = async (
     subKey: string,
     title: string,
     content: string,
@@ -468,24 +535,34 @@ export const DocumentsPage: React.FC = () => {
     }
     const body = [content, tableText].filter(Boolean).join("\n\n");
     const formatted = `### ${title}\n\n${body}`;
-    navigator.clipboard.writeText(formatted);
-    setCopiedSubKey(subKey);
-    setTimeout(() => setCopiedSubKey(null), 1800);
+    const ok = await copyToClipboard(formatted);
+    if (ok) {
+      setCopiedSubKey(subKey);
+      setTimeout(() => setCopiedSubKey(null), 1800);
+    }
   };
 
-  const handleCopyAll = () => {
+  /**
+   * Copies all sections of the active document as Markdown to the clipboard.
+   */
+  const handleCopyAll = async () => {
     if (!selectedDoc || selectedDoc.sections.length === 0) return;
     const formatted = selectedDoc.sections
       .map(
         (s, idx) => `## ${String(idx + 1).padStart(2, "0")} ${s.heading}\n\n${s.text}`
       )
       .join("\n\n---\n\n");
-    navigator.clipboard.writeText(formatted);
-    setAllCopied(true);
-    setTimeout(() => setAllCopied(false), 1800);
+    const ok = await copyToClipboard(formatted);
+    if (ok) {
+      setAllCopied(true);
+      setTimeout(() => setAllCopied(false), 1800);
+    }
   };
 
-  const handleCopyJSONView = () => {
+  /**
+   * Copies full document metadata and extracted sections as structured JSON.
+   */
+  const handleCopyJSONView = async () => {
     if (!selectedDoc) return;
     const payload = {
       success: true,
@@ -498,12 +575,19 @@ export const DocumentsPage: React.FC = () => {
       },
       data: selectedDoc.sections,
     };
-    navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-    setJsonCopied(true);
-    setTimeout(() => setJsonCopied(false), 1800);
+    const ok = await copyToClipboard(JSON.stringify(payload, null, 2));
+    if (ok) {
+      setJsonCopied(true);
+      setTimeout(() => setJsonCopied(false), 1800);
+    }
   };
 
-  const handleCopyTable = (tableData: SectionTableData) => {
+  /**
+   * Copies table rows or key-value pairs formatted as tab-separated values.
+   *
+   * @param tableData - Table data for the section.
+   */
+  const handleCopyTable = async (tableData: SectionTableData) => {
     let text = "";
     if (tableData.realTables && tableData.realTables.length > 0) {
       const chunks = tableData.realTables.map((tbl) => {
@@ -518,9 +602,11 @@ export const DocumentsPage: React.FC = () => {
       const rows = tableData.keyValues.map((kv) => `${kv.key}\t${kv.value}`);
       text = `Field\tValue\n${rows.join("\n")}`;
     }
-    navigator.clipboard.writeText(text);
-    setCopiedTableId(tableData.sectionId);
-    setTimeout(() => setCopiedTableId(null), 1800);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedTableId(tableData.sectionId);
+      setTimeout(() => setCopiedTableId(null), 1800);
+    }
   };
 
   const handleDownloadJSON = () => {

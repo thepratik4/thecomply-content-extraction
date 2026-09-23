@@ -11,6 +11,12 @@ interface ISTState {
   timeStr: string;
 }
 
+/**
+ * Computes contextual greeting, display icon, and formatted time
+ * in Indian Standard Time (IST / Asia/Kolkata).
+ *
+ * @returns Object with greeting, icon, subtitle, and formatted IST time string.
+ */
 function getISTState(): ISTState {
   const now = new Date();
   
@@ -63,6 +69,13 @@ function getISTState(): ISTState {
   }
 }
 
+/**
+ * Sidebar footer widget displaying dynamic time-of-day greetings and operational status
+ * based on Indian Standard Time (IST).
+ *
+ * @param props - Component properties, including isCollapsed flag for icon-only mode.
+ * @returns Card or icon badge element.
+ */
 export const SidebarGreeting: React.FC<SidebarGreetingProps> = ({ isCollapsed = false }) => {
   const [ist, setIst] = useState<ISTState>(getISTState);
 

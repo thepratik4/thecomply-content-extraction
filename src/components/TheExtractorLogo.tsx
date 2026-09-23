@@ -6,6 +6,13 @@ interface TheExtractorLogoProps {
   style?: React.CSSProperties;
 }
 
+/**
+ * Primary vector SVG brand logo component for TheExtractor.
+ * Renders a precision document icon with structured extraction layers and scan beam.
+ *
+ * @param props - Component properties including size, className, and optional style overrides.
+ * @returns An accessible SVG brand badge element.
+ */
 export const TheExtractorLogo: React.FC<TheExtractorLogoProps> = ({
   size = 24,
   className = "",

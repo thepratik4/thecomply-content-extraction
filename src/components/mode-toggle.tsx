@@ -2,14 +2,26 @@ import React from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "./theme-provider"
 
+/**
+ * Sliding pill theme toggle switch allowing users to transition between light and dark themes.
+ *
+ * @param props - Component properties, including optional className for layout overrides.
+ * @returns Sliding pill switch element.
+ */
 export function ModeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme()
   const isDark = theme === "dark"
 
+  /**
+   * Toggles between dark and light themes.
+   */
   const toggleTheme = () => {
     setTheme(isDark ? "light" : "dark")
   }
 
+  /**
+   * Handles keyboard interaction (Enter and Space) for accessible toggle control.
+   */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault()

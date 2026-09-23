@@ -88,6 +88,12 @@ const TOUR_STEPS: TourStep[] = [
   },
 ];
 
+/**
+ * Header button component that triggers the interactive onboarding tour.
+ *
+ * @param props - Component properties, including tab switch and tour request callbacks.
+ * @returns Button element indicating tour status.
+ */
 const TourTriggerButton: React.FC<{
   onSwitchTab?: () => void;
   onRequestTour?: () => void;
@@ -109,6 +115,13 @@ const TourTriggerButton: React.FC<{
   );
 };
 
+/**
+ * Renders the dashboard shell including the collapsible sidebar,
+ * top navigation bar, and active dashboard module workspace.
+ *
+ * @param props - Component properties including current tab and navigation handlers.
+ * @returns Complete dashboard view layout.
+ */
 const DashboardContent: React.FC<{
   activeTab: DashboardTab;
   onSelectTab: (tab: DashboardTab) => void;
@@ -233,6 +246,10 @@ const DashboardContent: React.FC<{
   );
 };
 
+/**
+ * Main application content container managing route state, tour confirmation dialogs,
+ * and switching between the public landing page and the authenticated dashboard.
+ */
 const AppContent: React.FC = () => {
   const { startTour } = useTour();
   const { navigate, isDashboard, currentTab } = useRouter();
@@ -427,6 +444,9 @@ const AppContent: React.FC = () => {
   );
 };
 
+/**
+ * Root application component wrapping AppContent with TourProvider.
+ */
 const App: React.FC = () => {
   return (
     <TourProvider defaultSteps={TOUR_STEPS}>

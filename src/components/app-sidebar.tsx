@@ -28,6 +28,13 @@ interface AppSidebarProps {
   onExitDashboard?: () => void
 }
 
+/**
+ * Primary sidebar navigation component for the dashboard, containing application modules,
+ * pinned settings in the footer, and the dynamic IST greeting widget.
+ *
+ * @param props - Component properties, including active navigation item and selection handlers.
+ * @returns Sidebar navigation element.
+ */
 export function AppSidebar({
   activeItem = "studio",
   onSelectItem,
@@ -35,6 +42,11 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const { state, isMobile, setOpenMobile, toggleSidebar } = useSidebar()
 
+  /**
+   * Handles selection of a sidebar menu item and closes mobile drawer if open.
+   *
+   * @param item - Identifier of the selected navigation module.
+   */
   const handleSelect = (item: string) => {
     onSelectItem?.(item)
     if (isMobile) {
@@ -42,6 +54,9 @@ export function AppSidebar({
     }
   }
 
+  /**
+   * Handles exiting the dashboard back to the landing page and closes mobile drawer.
+   */
   const handleExit = () => {
     if (isMobile) {
       setOpenMobile(false)
@@ -63,50 +78,65 @@ export function AppSidebar({
             overflow: "visible",
           }}
         >
-          <div
-            onClick={() => {
-              if (state === "collapsed") {
-                toggleSidebar()
-              } else {
-                handleExit()
-              }
-            }}
-            title={state === "collapsed" ? "Expand sidebar" : "TheExtractor · Return to Home"}
-            style={{
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: 8,
-              flexShrink: 0,
-              transition: "transform 0.18s ease, filter 0.18s ease",
-            }}
-          >
-            <TheExtractorLogo size={28} />
-          </div>
-          {state !== "collapsed" && (
+          {state === "collapsed" ? (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+              style={{
+                cursor: "pointer",
+                background: "transparent",
+                border: "none",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 8,
+                flexShrink: 0,
+                transition: "transform 0.18s ease, filter 0.18s ease",
+              }}
+            >
+              <TheExtractorLogo size={28} />
+            </button>
+          ) : (
             <div
               style={{
-                flex: 1,
-                minWidth: 0,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                cursor: "pointer",
+                width: "100%",
               }}
-              onClick={handleExit}
-              title="TheExtractor · Return to Home"
             >
-              <span
+              <button
+                type="button"
+                onClick={handleExit}
+                title="TheExtractor · Return to Home"
+                aria-label="TheExtractor, Return to Home"
                 style={{
-                  fontSize: 15,
-                  fontWeight: 700,
-                  color: "var(--sidebar-foreground, #18181b)",
-                  letterSpacing: "-0.01em",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  textAlign: "left",
                 }}
               >
-                TheExtractor
-              </span>
+                <TheExtractorLogo size={28} />
+                <span
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: "var(--sidebar-foreground, #18181b)",
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  TheExtractor
+                </span>
+              </button>
+
               {isMobile && (
                 <button
                   type="button"
@@ -123,6 +153,7 @@ export function AppSidebar({
                     opacity: 0.7,
                   }}
                   title="Close sidebar"
+                  aria-label="Close sidebar"
                 >
                   <X size={18} />
                 </button>
