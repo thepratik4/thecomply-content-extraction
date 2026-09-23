@@ -9,6 +9,7 @@ import {
   Sidebar,
   SidebarHeader,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarGroupContent,
@@ -19,6 +20,7 @@ import {
   useSidebar,
 } from "./ui/sidebar"
 import { TheExtractorLogo } from "./TheExtractorLogo"
+import { SidebarGreeting } from "./SidebarGreeting"
 
 interface AppSidebarProps {
   activeItem?: string
@@ -174,30 +176,34 @@ export function AppSidebar({
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        {/* Group 2: Developer / Settings */}
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            <span>Preferences</span>
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeItem === "settings"}
-                  onClick={() => handleSelect("settings")}
-                  title="Settings"
-                >
-                  <Settings size={16} />
-                  <span className="sidebar-menu-button-text">Settings</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
+      {/* ─── Footer: Pinned Settings & IST Greeting Widget ───── */}
+      <SidebarFooter
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: state === "collapsed" ? "center" : "stretch",
+          width: "100%",
+          padding: state === "collapsed" ? "8px 4px" : "10px 12px",
+          gap: 10,
+        }}
+      >
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              isActive={activeItem === "settings"}
+              onClick={() => handleSelect("settings")}
+              title="Settings"
+            >
+              <Settings size={16} />
+              <span className="sidebar-menu-button-text">Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
 
+        <SidebarGreeting isCollapsed={state === "collapsed"} />
+      </SidebarFooter>
 
       {/* ─── Collapsible Rail ─────────────────────────────────── */}
       <SidebarRail />
