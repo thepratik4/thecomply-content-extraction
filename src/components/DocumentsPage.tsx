@@ -325,6 +325,33 @@ function formatCellContent(cell: string): string {
 }
 
 /**
+ * Formats the body text of a section for clipboard copying. If the section body
+ * text is non-empty, it is returned as-is to avoid duplicate content; if blank,
+ * any attached table data is serialized as tab-separated values.
+ *
+ * @param section - The section whose text or tables should be formatted.
+ * @returns Plain text representation of the section body or serialized tables.
+ */
+function formatSectionText(section: ExtractedSection): string {
+  if (section.text && section.text.trim()) {
+    return section.text;
+  }
+  const realTables = Array.isArray(section.tables) ? (section.tables as ExtractedTable[]) : [];
+  if (realTables.length > 0) {
+    return realTables
+      .map((t) =>
+        [
+          (t.columns || []).map((c) => formatCellContent(c)).join("\t"),
+          ...(t.rows || []).map((r) => r.map((c) => formatCellContent(c)).join("\t")),
+        ].join("\n")
+      )
+      .join("\n\n");
+  }
+  return "";
+}
+
+
+/**
  * Safely copies text to the system clipboard, falling back to a hidden textarea
  * element when the Clipboard API is unavailable or rejected.
  *
@@ -445,13 +472,17 @@ export const DocumentsPage: React.FC = () => {
     const tables: SectionTableData[] = [];
 
     selectedDoc.sections.forEach((sec, idx) => {
-      const lines = sec.text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-      const kvs = lines
-        .map(parseKeyValue)
-        .filter((kv): kv is KeyValueRow => kv !== null);
       const realTables: ExtractedTable[] = Array.isArray(sec.tables)
         ? (sec.tables as ExtractedTable[])
         : [];
+      const serializedRows = getSerializedTableRows(realTables);
+      const lines = sec.text
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter((l) => Boolean(l) && !serializedRows.has(l));
+      const kvs = lines
+        .map(parseKeyValue)
+        .filter((kv): kv is KeyValueRow => kv !== null);
 
       if (kvs.length > 0 || realTables.length > 0) {
         tables.push({
@@ -500,7 +531,8 @@ export const DocumentsPage: React.FC = () => {
    * @param section - Section content object.
    */
   const handleCopyCurrentSection = async (index: number, section: ExtractedSection) => {
-    const formatted = `## ${section.heading}\n\n${section.text}`;
+    const body = formatSectionText(section);
+    const formatted = body ? `## ${section.heading}\n\n${body}` : `## ${section.heading}`;
     const ok = await copyToClipboard(formatted);
     if (ok) {
       setCopiedSectionIndex(index);
@@ -548,9 +580,11 @@ export const DocumentsPage: React.FC = () => {
   const handleCopyAll = async () => {
     if (!selectedDoc || selectedDoc.sections.length === 0) return;
     const formatted = selectedDoc.sections
-      .map(
-        (s, idx) => `## ${String(idx + 1).padStart(2, "0")} ${s.heading}\n\n${s.text}`
-      )
+      .map((s, idx) => {
+        const body = formatSectionText(s);
+        const prefix = `## ${String(idx + 1).padStart(2, "0")} ${s.heading}`;
+        return body ? `${prefix}\n\n${body}` : prefix;
+      })
       .join("\n\n---\n\n");
     const ok = await copyToClipboard(formatted);
     if (ok) {
@@ -583,25 +617,27 @@ export const DocumentsPage: React.FC = () => {
   };
 
   /**
-   * Copies table rows or key-value pairs formatted as tab-separated values.
+   * Copies table rows and independent key-value pairs formatted as tab-separated values.
    *
    * @param tableData - Table data for the section.
    */
   const handleCopyTable = async (tableData: SectionTableData) => {
-    let text = "";
+    const parts: string[] = [];
     if (tableData.realTables && tableData.realTables.length > 0) {
       const chunks = tableData.realTables.map((tbl) => {
-        const header = tbl.columns.map((c) => formatCellContent(c)).join("\t");
-        const body = tbl.rows
+        const header = (tbl.columns || []).map((c) => formatCellContent(c)).join("\t");
+        const body = (tbl.rows || [])
           .map((row) => row.map((c) => formatCellContent(c)).join("\t"))
           .join("\n");
         return `${header}\n${body}`;
       });
-      text = chunks.join("\n\n");
-    } else {
-      const rows = tableData.keyValues.map((kv) => `${kv.key}\t${kv.value}`);
-      text = `Field\tValue\n${rows.join("\n")}`;
+      parts.push(chunks.join("\n\n"));
     }
+    if (tableData.keyValues && tableData.keyValues.length > 0) {
+      const rows = tableData.keyValues.map((kv) => `${kv.key}\t${kv.value}`);
+      parts.push(`Field\tValue\n${rows.join("\n")}`);
+    }
+    const text = parts.join("\n\n");
     const ok = await copyToClipboard(text);
     if (ok) {
       setCopiedTableId(tableData.sectionId);
@@ -1241,9 +1277,16 @@ export const DocumentsPage: React.FC = () => {
                             </span>
                           ) : null}
                           <span className="table-card-count">
-                            {tData.realTables.length > 0
-                              ? `${tData.realTables.length} table${tData.realTables.length === 1 ? "" : "s"}`
-                              : `${tData.keyValues.length} ${tData.keyValues.length === 1 ? "field" : "fields"}`}
+                            {[
+                              tData.realTables.length > 0
+                                ? `${tData.realTables.length} table${tData.realTables.length === 1 ? "" : "s"}`
+                                : null,
+                              tData.keyValues.length > 0
+                                ? `${tData.keyValues.length} ${tData.keyValues.length === 1 ? "field" : "fields"}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" • ")}
                           </span>
                         </div>
 
@@ -1267,50 +1310,50 @@ export const DocumentsPage: React.FC = () => {
                         </button>
                       </div>
 
-                      {tData.realTables.length > 0 ? (
-                        tData.realTables.map((tbl, tIdx) => (
-                          <div key={tIdx} className="table-scroll-wrap">
-                            <table
-                              className={`results-structured-table ${
-                                tbl.columns.length > 2 ? "results-structured-table--multi" : ""
-                              }`}
-                            >
-                              <thead>
-                                <tr>
-                                  {tbl.columns.map((col, cIdx) => (
-                                    <th
-                                      key={cIdx}
-                                      className={getTableCellClass(col, tbl.columns.length, cIdx)}
-                                    >
-                                      {col || `Col ${cIdx + 1}`}
-                                    </th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {tbl.rows.map((row, rIdx) => (
-                                  <tr key={rIdx}>
-                                    {row.map((cell, cIdx) => {
-                                      const colName = tbl.columns[cIdx] || "";
-                                      const cellClass = getTableCellClass(
-                                        colName,
-                                        tbl.columns.length,
-                                        cIdx
-                                      );
-                                      const formatted = formatCellContent(cell);
-                                      return (
-                                        <td key={cIdx} className={cellClass}>
-                                          {formatted}
-                                        </td>
-                                      );
-                                    })}
-                                  </tr>
+                      {tData.realTables.map((tbl, tIdx) => (
+                        <div key={`tbl-${tIdx}`} className="table-scroll-wrap">
+                          <table
+                            className={`results-structured-table ${
+                              tbl.columns.length > 2 ? "results-structured-table--multi" : ""
+                            }`}
+                          >
+                            <thead>
+                              <tr>
+                                {tbl.columns.map((col, cIdx) => (
+                                  <th
+                                    key={cIdx}
+                                    className={getTableCellClass(col, tbl.columns.length, cIdx)}
+                                  >
+                                    {col || `Col ${cIdx + 1}`}
+                                  </th>
                                 ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        ))
-                      ) : (
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {tbl.rows.map((row, rIdx) => (
+                                <tr key={rIdx}>
+                                  {row.map((cell, cIdx) => {
+                                    const colName = tbl.columns[cIdx] || "";
+                                    const cellClass = getTableCellClass(
+                                      colName,
+                                      tbl.columns.length,
+                                      cIdx
+                                    );
+                                    const formatted = formatCellContent(cell);
+                                    return (
+                                      <td key={cIdx} className={cellClass}>
+                                        {formatted}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ))}
+
+                      {tData.keyValues.length > 0 && (
                         <div className="table-scroll-wrap">
                           <table className="results-structured-table">
                             <thead>

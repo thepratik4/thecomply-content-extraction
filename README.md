@@ -43,7 +43,7 @@ The application features a built-in **Interactive Guided Tour** that walks evalu
 Follow these straightforward steps to get both the Python FastAPI backend and the React frontend running locally.
 
 ### Prerequisites
-- **Node.js**: `v18.0.0` or higher (`v20+` recommended)
+- **Node.js**: `20.19.0`–`20.x` or `22.12.0+` (Vite 8.3.0 engine requirement; Node.js 18 is not supported)
 - **Python**: `3.10` or higher
 - **Package Managers**: `npm` and `pip`
 
@@ -197,7 +197,7 @@ Uploads a PDF file via `multipart/form-data` and returns the structured extracti
 #### Error Responses:
 - `400 Bad Request`: Empty file or missing upload.
 - `422 Unprocessable Entity`: Non-PDF file, missing `%PDF-` signature, or corrupted binary stream.
-- `504 Gateway Timeout`: Processing exceeded the 30-second execution threshold.
+- `504 Gateway Timeout`: Processing exceeded the 90-second execution threshold.
 
 ---
 

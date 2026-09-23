@@ -41,6 +41,7 @@ export function AppSidebar({
   onExitDashboard,
 }: AppSidebarProps) {
   const { state, isMobile, setOpenMobile, toggleSidebar } = useSidebar()
+  const isEffectiveCollapsed = !isMobile && state === "collapsed"
 
   /**
    * Handles selection of a sidebar menu item and closes mobile drawer if open.
@@ -72,13 +73,13 @@ export function AppSidebar({
           style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: state === "collapsed" ? "center" : "flex-start",
-            gap: state === "collapsed" ? 0 : 10,
+            justifyContent: isEffectiveCollapsed ? "center" : "flex-start",
+            gap: isEffectiveCollapsed ? 0 : 10,
             width: "100%",
             overflow: "visible",
           }}
         >
-          {state === "collapsed" ? (
+          {isEffectiveCollapsed ? (
             <button
               type="button"
               onClick={toggleSidebar}
@@ -214,9 +215,9 @@ export function AppSidebar({
         style={{
           display: "flex",
           flexDirection: "column",
-          alignItems: state === "collapsed" ? "center" : "stretch",
+          alignItems: isEffectiveCollapsed ? "center" : "stretch",
           width: "100%",
-          padding: state === "collapsed" ? "8px 4px" : "10px 12px",
+          padding: isEffectiveCollapsed ? "8px 4px" : "10px 12px",
           gap: 10,
         }}
       >
@@ -233,7 +234,7 @@ export function AppSidebar({
           </SidebarMenuItem>
         </SidebarMenu>
 
-        <SidebarGreeting isCollapsed={state === "collapsed"} />
+        <SidebarGreeting isCollapsed={isEffectiveCollapsed} />
       </SidebarFooter>
 
       {/* ─── Collapsible Rail ─────────────────────────────────── */}
