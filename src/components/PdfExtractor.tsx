@@ -1100,7 +1100,7 @@ export const PdfExtractor: React.FC = () => {
                 <X size={16} className="error-icon" />
                 <div className="error-content">
                   <p className="error-msg">{error}</p>
-                  <button type="button" className="error-retry-link" onClick={handleExtract}>
+                  <button type="button" className="error-retry-link" onClick={() => handleExtract()}>
                     Retry extraction
                   </button>
                 </div>

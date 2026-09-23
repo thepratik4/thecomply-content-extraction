@@ -156,8 +156,7 @@ export const TourProvider: React.FC<TourProviderProps> = ({
     } else {
       // If target element is not in DOM:
       if (currentStepIndex === 0) {
-        // Step 1: if dropzone is missing (document loaded), reset workspace to restore dropzone
-        window.dispatchEvent(new CustomEvent("extractai:reset-workspace"));
+        // Step 1: dropzone is temporarily absent, keep branch as no-op
       } else {
         // For Step 2 or others while results are still loading:
         // Highlight the compact document bar / loading progress bar if present
@@ -207,8 +206,11 @@ export const TourProvider: React.FC<TourProviderProps> = ({
     };
   }, [isActive, currentStepIndex, currentStep, updateTargetRect]);
 
+  const lastActiveElementRef = useRef<HTMLElement | null>(null);
+
   const startTour = useCallback(
     (customSteps?: TourStep[]) => {
+      lastActiveElementRef.current = document.activeElement as HTMLElement | null;
       if (customSteps && customSteps.length > 0) {
         setSteps(customSteps);
       } else if (defaultSteps.length > 0) {
@@ -222,32 +224,40 @@ export const TourProvider: React.FC<TourProviderProps> = ({
   const endTour = useCallback(() => {
     setCurrentStepIndex(-1);
     setElementRect(null);
+    lastActiveElementRef.current?.focus?.();
   }, []);
 
   const nextStep = useCallback(() => {
-    setCurrentStepIndex((prev) => {
-      if (prev === 0) {
-        // Advancing from Step 1: if document not loaded yet, auto-load sample
-        if (!(window as any).__extractai_has_work) {
-          window.dispatchEvent(new CustomEvent("extractai:load-sample"));
-        }
+    if (currentStepIndex === 0) {
+      // Advancing from Step 1: if document not loaded yet, auto-load sample
+      if (!(window as any).__extractai_has_work) {
+        window.dispatchEvent(new CustomEvent("extractai:load-sample"));
       }
-      if (prev >= steps.length - 1) {
-        return -1;
-      }
-      return prev + 1;
-    });
-  }, [steps.length]);
+    }
+    if (currentStepIndex >= steps.length - 1) {
+      endTour();
+      return;
+    }
+    setCurrentStepIndex(currentStepIndex + 1);
+  }, [currentStepIndex, steps.length, endTour]);
 
   const prevStep = useCallback(() => {
-    setCurrentStepIndex((prev) => {
-      const nextIdx = prev > 0 ? prev - 1 : prev;
-      if (nextIdx === 0) {
-        window.dispatchEvent(new CustomEvent("extractai:reset-workspace"));
-      }
-      return nextIdx;
-    });
-  }, []);
+    if (currentStepIndex <= 0) return;
+    const nextIdx = currentStepIndex - 1;
+    if (nextIdx === 0) {
+      window.dispatchEvent(new CustomEvent("extractai:reset-workspace"));
+    }
+    setCurrentStepIndex(nextIdx);
+  }, [currentStepIndex]);
+
+  // Focus card when step changes or tour becomes active
+  useEffect(() => {
+    if (!isActive) return;
+    const timer = setTimeout(() => {
+      cardRef.current?.focus();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [isActive, currentStepIndex]);
 
   // Listen for external trigger to advance tour step (e.g. on file drop or sample load)
   const isAdvancingRef = useRef(false);
@@ -267,17 +277,43 @@ export const TourProvider: React.FC<TourProviderProps> = ({
     return () => window.removeEventListener("extractai:tour-next-step", handleTourNext);
   }, [isActive, currentStepIndex, nextStep]);
 
-  // Keyboard navigation: ArrowRight / ArrowLeft / Escape
+  // Keyboard navigation: ArrowRight / ArrowLeft / Escape and Tab trap
   useEffect(() => {
     if (!isActive) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         endTour();
-      } else if (e.key === "ArrowRight") {
+        return;
+      }
+      if (e.key === "ArrowRight") {
         nextStep();
-      } else if (e.key === "ArrowLeft") {
+        return;
+      }
+      if (e.key === "ArrowLeft") {
         prevStep();
+        return;
+      }
+      if (e.key === "Tab" && cardRef.current) {
+        const focusable = cardRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first || document.activeElement === cardRef.current) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
       }
     };
 
@@ -315,7 +351,7 @@ export const TourProvider: React.FC<TourProviderProps> = ({
       {/* Render Tour Portal when tour is active */}
       {isActive &&
         createPortal(
-          <div className="tour-overlay-portal" role="dialog" aria-modal="true">
+          <div className="tour-overlay-portal">
             {/* 4-Panel Backdrop: Leaves cutout 100% open so clicking inside never closes the tour and drag-and-drop works natively */}
             {elementRect ? (
               <>
@@ -449,6 +485,10 @@ export const TourProvider: React.FC<TourProviderProps> = ({
               <div
                 ref={cardRef}
                 className="tour-card"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="tour-step-card-title"
+                tabIndex={-1}
                 style={{
                   top: cardPos.top,
                   left: cardPos.left,
@@ -472,7 +512,7 @@ export const TourProvider: React.FC<TourProviderProps> = ({
                   </button>
                 </div>
 
-                <h4 className="tour-card-title">{currentStep.title}</h4>
+                <h4 id="tour-step-card-title" className="tour-card-title">{currentStep.title}</h4>
                 <p className="tour-card-desc">{currentStep.description}</p>
 
                 {/* Optional Custom Action Button */}
