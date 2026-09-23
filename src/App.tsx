@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import ContractAnimation from "./components/ContractAnimation";
 import PdfExtractor from "./components/PdfExtractor";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "./components/ui/sidebar";
@@ -218,7 +218,7 @@ const DashboardContent: React.FC<{
                 <span style={{ fontSize: 20, fontWeight: 700 }}>✦</span>
               </div>
               <h3 style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", marginBottom: 8 }}>
-                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Workspace
+                {String(activeTab).charAt(0).toUpperCase() + String(activeTab).slice(1)} Workspace
               </h3>
               <p style={{ fontSize: 13, color: "#71717a", maxWidth: 400, margin: "0 auto 20px auto" }}>
                 This dashboard module is configured as part of TheExtractor.
