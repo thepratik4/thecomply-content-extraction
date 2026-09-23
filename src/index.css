@@ -19,6 +19,7 @@
   --accent-red-light: #fef2f2;
   --header-bg: #ffffff;
   --table-head-bg: #fbfbfb;
+  --table-row-hover: rgba(0, 0, 0, 0.025);
 
   --sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -49,6 +50,15 @@
   --accent-red-light: rgba(239, 68, 68, 0.15);
   --header-bg: #121215;
   --table-head-bg: #18181c;
+  --table-row-hover: rgba(255, 255, 255, 0.05);
+}
+
+.documents-table-row {
+  transition: background 0.12s ease;
+}
+
+.documents-table-row:hover {
+  background: var(--table-row-hover) !important;
 }
 
 body {

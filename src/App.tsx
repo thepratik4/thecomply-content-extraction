@@ -315,7 +315,7 @@ const AppContent: React.FC = () => {
                 }}
               >
                 <span className="nav-logo-square" />
-                <span className="nav-logo-text">Thecomply.ai</span>
+                <span className="nav-logo-text">TheExtractor</span>
               </a>
 
               <div className="nav-cta">

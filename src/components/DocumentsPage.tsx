@@ -1423,15 +1423,9 @@ export const DocumentsPage: React.FC = () => {
               {filteredDocs.map((doc, idx) => (
                 <tr
                   key={doc.id}
+                  className="documents-table-row"
                   style={{
-                    borderBottom: idx === filteredDocs.length - 1 ? "none" : "1px solid #f4f4f5",
-                    transition: "background 0.12s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#f9f9fb";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
+                    borderBottom: idx === filteredDocs.length - 1 ? "none" : "1px solid var(--border-subtle, #f4f4f5)",
                   }}
                 >
                   {/* Filename */}
