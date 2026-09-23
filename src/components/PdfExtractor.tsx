@@ -12,7 +12,6 @@ import {
   ChevronRight,
   X,
   Code2,
-  ArrowRight,
   Loader2,
   ExternalLink,
   RefreshCw,
