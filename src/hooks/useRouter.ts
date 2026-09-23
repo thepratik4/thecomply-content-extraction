@@ -3,117 +3,116 @@ import { useState, useEffect, useCallback } from "react";
 export type DashboardTab = "studio" | "documents" | "batch" | "settings";
 
 /**
- * Maps the current URL pathname to the active dashboard tab.
- *
- * @param pathname - The browser pathname to evaluate.
- * @returns The corresponding DashboardTab identifier.
+ * Maps a pathname to the active dashboard tab.
+ * Works with both legacy pathnames (/dashboard/documents) and hash paths (#/dashboard/documents).
  */
 function getTabFromPath(pathname: string): DashboardTab {
   const normalized = pathname.toLowerCase().replace(/\/$/, "");
-  if (normalized.includes("/documents") || normalized === "/documents") {
-    return "documents";
-  }
-  if (normalized.includes("/batch") || normalized === "/batch") {
-    return "batch";
-  }
-  if (normalized.includes("/settings") || normalized === "/settings") {
-    return "settings";
-  }
+  if (normalized.includes("/documents")) return "documents";
+  if (normalized.includes("/batch"))     return "batch";
+  if (normalized.includes("/settings"))  return "settings";
   return "studio";
 }
 
 /**
- * Checks whether the current URL path belongs to the dashboard environment.
- *
- * @param pathname - The browser pathname to evaluate.
- * @returns True if the path represents a dashboard route; false otherwise.
+ * Returns true when the current path represents a dashboard route.
  */
 function isDashboardPath(pathname: string): boolean {
   const normalized = pathname.toLowerCase().replace(/\/$/, "");
   return (
     normalized.startsWith("/dashboard") ||
-    normalized === "/studio" ||
-    normalized === "/documents" ||
-    normalized === "/batch" ||
+    normalized === "/studio"            ||
+    normalized === "/documents"         ||
+    normalized === "/batch"             ||
     normalized === "/settings"
   );
 }
 
 /**
- * Lightweight HTML5 History router hook providing client-side navigation,
- * browser Back/Forward synchronization, and URL hash compatibility.
+ * Derives the logical pathname from the current browser URL.
  *
- * @returns Router context with current pathname, navigate function, dashboard state, and active tab.
+ * Navigation uses hash-based routing (#/dashboard/documents) so the server
+ * always receives a request for "/" and never needs to know about sub-routes.
+ * This permanently eliminates 404 errors on page reload in Vercel's Services
+ * architecture (or any static host) without any server-side configuration.
+ *
+ * Legacy hashes (#extractor, #studio) are still supported for backward compat.
+ */
+function getRoutePath(): string {
+  if (typeof window === "undefined") return "/";
+
+  const hash = window.location.hash;
+
+  // Hash-based routing — primary mechanism
+  // URL shape: theextractor.vercel.app/#/dashboard/documents
+  if (hash.startsWith("#/")) return hash.slice(1); // "#/dashboard/documents" → "/dashboard/documents"
+
+  // Legacy hashes kept for backward compatibility
+  if (hash === "#extractor" || hash === "#studio") return "/dashboard";
+
+  // Fallback: read the actual pathname (covers the landing page at "/")
+  return window.location.pathname || "/";
+}
+
+/**
+ * Lightweight hash-based router hook providing client-side navigation and
+ * browser Back/Forward synchronisation.
+ *
+ * URL format: /#/dashboard/documents
+ *   • Everything before "#" is always "/" — the server serves index.html.
+ *   • Everything after "#" is handled entirely in the browser by this hook.
+ *
+ * @returns Router context: pathname, navigate, isDashboard, currentTab.
  */
 export function useRouter() {
-  const [pathname, setPathname] = useState<string>(() => {
-    if (typeof window === "undefined") return "/";
-
-    // Restore path saved by public/404.html when Vercel served the SPA fallback
-    // on a hard reload of a deep-link (e.g. /dashboard/documents).
-    const redirectPath = sessionStorage.getItem("spa_redirect_path");
-    if (redirectPath) {
-      sessionStorage.removeItem("spa_redirect_path");
-      // Replace the current history entry so the correct URL shows immediately
-      window.history.replaceState(null, "", redirectPath);
-      return redirectPath;
-    }
-
-    // Check hash fallback on first load (e.g. #extractor or #studio)
-    if (window.location.hash === "#extractor" || window.location.hash === "#studio") {
-      return "/dashboard";
-    }
-    return window.location.pathname || "/";
-  });
+  const [pathname, setPathname] = useState<string>(getRoutePath);
 
   useEffect(() => {
-    const handlePopState = () => {
-      setPathname(window.location.pathname || "/");
-    };
+    /**
+     * Fires on both browser back/forward (popstate) and programmatic hash
+     * changes (hashchange). Both events must be handled because:
+     *   • popstate  fires when returning to "/" from a hash URL
+     *   • hashchange fires when moving between hash routes
+     */
+    const sync = () => setPathname(getRoutePath());
 
-    const handleHashChange = () => {
-      if (window.location.hash === "#extractor" || window.location.hash === "#studio") {
-        if (window.location.pathname === "/") {
-          window.history.pushState(null, "", "/dashboard");
-          setPathname("/dashboard");
-        }
-      }
-    };
-
-    window.addEventListener("popstate", handlePopState);
-    window.addEventListener("hashchange", handleHashChange);
-
-    // If loaded with hash, update url without reloading
-    if (window.location.hash === "#extractor" || window.location.hash === "#studio") {
-      window.history.replaceState(null, "", "/dashboard");
-    }
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate",   sync);
 
     return () => {
-      window.removeEventListener("popstate", handlePopState);
-      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate",   sync);
     };
   }, []);
 
   /**
-   * Pushes a new route to the browser history and updates router state.
+   * Navigate to a route.
    *
-   * @param to - Target pathname to navigate to.
+   * • "/" (landing page) — uses pushState so the URL shows "/" without a hash.
+   * • Everything else    — sets window.location.hash, e.g. #/dashboard/documents.
+   *   The base URL stays "/" so the server is never asked for a non-existent path.
    */
   const navigate = useCallback((to: string) => {
-    if (to !== window.location.pathname) {
-      window.history.pushState(null, "", to);
-      setPathname(to);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    if (to === "/") {
+      // Landing page: clear the hash and restore the clean "/" URL
+      if (window.location.pathname !== "/" || window.location.hash !== "") {
+        window.history.pushState(null, "", "/");
+        setPathname("/");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    } else {
+      // All dashboard/sub routes: use hash routing
+      const newHash = `#${to}`;
+      if (window.location.hash !== newHash) {
+        window.location.hash = to; // sets window.location.hash and pushes history entry
+        setPathname(to);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
     }
   }, []);
 
   const isDashboard = isDashboardPath(pathname);
-  const currentTab = getTabFromPath(pathname);
+  const currentTab  = getTabFromPath(pathname);
 
-  return {
-    pathname,
-    navigate,
-    isDashboard,
-    currentTab,
-  };
+  return { pathname, navigate, isDashboard, currentTab };
 }
